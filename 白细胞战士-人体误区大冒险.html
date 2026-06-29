@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>白细胞战士 · 人体误区大冒险</title>
+<script src="models/gsap.min.js"></script>
+<script>
+// GSAP fallback: if it fails to load, create a minimal shim
+if(typeof gsap==='undefined'){
+  const _chain={to(){return _chain},from(){return _chain},call(){return _chain},fromTo(){return _chain},set(){return _chain}};
+  window.gsap={
+    set(el,props){if(typeof el==='string')el=document.querySelector(el);if(el)Object.assign(el.style,props)},
+    to(el,opts){if(typeof el==='string')el=document.querySelector(el);if(!el)return;if(opts.onComplete)setTimeout(opts.onComplete,(opts.duration||.5)*1000)},
+    from(el,opts){},
+    timeline(){return Object.create(_chain)}
+  };
+  console.warn('[GSAP] CDN failed, using fallback');
+}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;overflow:hidden;font-family:'Microsoft YaHei',sans-serif}
+canvas{display:block}
+#gameCanvas{position:fixed;top:0;left:0}
+
+/* Title */
+#titleScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0d1b2a,#1b263b 50%,#415a77);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity .8s}
+#titleScreen.hidden{opacity:0;pointer-events:none}
+#titleScreen h1{font-size:3.2em;color:#e0e1dd;text-shadow:0 0 30px #00b4d8,0 0 60px #0077b6;margin-bottom:10px}
+#titleScreen h2{font-size:1.4em;color:#778da9;margin-bottom:40px}
+.title-btn{padding:16px 48px;font-size:1.3em;border:2px solid #00b4d8;background:rgba(0,180,216,.15);color:#00b4d8;border-radius:50px;cursor:pointer;margin:8px;transition:all .3s;font-family:inherit}
+.title-btn:hover{background:#00b4d8;color:#0a0a1a;box-shadow:0 0 30px rgba(0,180,216,.5)}
+.title-btn.s2{border-color:#e63946;color:#e63946;background:rgba(230,57,70,.15)}
+.title-btn.s2:hover{background:#e63946;color:#fff;box-shadow:0 0 30px rgba(230,57,70,.5)}
+.title-cells{position:absolute;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.fc{position:absolute;border-radius:50%;opacity:.15;animation:fl linear infinite}
+@keyframes fl{0%{transform:translateY(100vh) rotate(0)}100%{transform:translateY(-100px) rotate(360deg)}}
+
+/* HUD */
+#hud{position:fixed;top:50px;left:0;width:100%;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,.7),transparent);z-index:50;pointer-events:none}
+#hud>*{pointer-events:auto}
+.hl,.hr{display:flex;align-items:center;gap:16px}
+.hp-bar{width:180px;height:18px;background:rgba(255,255,255,.15);border-radius:9px;overflow:hidden;position:relative}
+.hp-fill{height:100%;background:linear-gradient(90deg,#e63946,#ff6b6b);border-radius:9px;transition:width .4s}
+.hp-text{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:bold;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.hud-score{color:#ffd166;font-size:1.1em;font-weight:bold}
+.hud-region{color:#a8dadc;font-size:.95em}
+.xp-bar{width:120px;height:8px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden}
+.xp-fill{height:100%;background:linear-gradient(90deg,#06d6a0,#00b4d8);border-radius:4px;transition:width .4s}
+.hud-lv{color:#06d6a0;font-size:.9em;font-weight:bold}
+
+/* Minimap */
+#minimap{position:fixed;bottom:16px;right:16px;width:160px;height:160px;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.2);border-radius:12px;z-index:50;overflow:hidden;display:none}
+#minimapCanvas{width:100%;height:100%}
+
+/* Battle */
+#battleOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center}
+#battleOverlay.active{display:flex}
+.battle-scene{width:90%;max-width:700px;text-align:center;margin-bottom:20px}
+.battle-monster{font-size:80px;margin-bottom:8px;animation:mb 1s ease-in-out infinite}
+@keyframes mb{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.battle-monster-name{color:#e63946;font-size:1.5em;font-weight:bold;text-shadow:0 0 15px rgba(230,57,70,.6)}
+.battle-progress{color:#778da9;font-size:.9em;margin-top:4px}
+.battle-question{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:24px;margin:16px auto;max-width:700px;width:90%}
+.battle-misconception{color:#ff6b6b;font-size:1.05em;margin-bottom:16px;line-height:1.6}
+.battle-prompt{color:#a8dadc;font-size:.95em;margin-bottom:16px}
+.battle-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.battle-option{padding:14px 20px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#e0e1dd;border-radius:12px;cursor:pointer;font-size:1em;transition:all .3s;font-family:inherit;text-align:left}
+.battle-option:hover{border-color:#00b4d8;background:rgba(0,180,216,.15)}
+.battle-option.correct{border-color:#06d6a0!important;background:rgba(6,214,160,.2)!important;color:#06d6a0}
+.battle-option.wrong{border-color:#e63946!important;background:rgba(230,57,70,.2)!important;color:#e63946}
+.battle-option.disabled{pointer-events:none;opacity:.6}
+.battle-result{margin-top:16px;padding:16px;border-radius:12px;display:none}
+.battle-result.show{display:block}
+.battle-result.cr{background:rgba(6,214,160,.15);border:1px solid #06d6a0}
+.battle-result.wr{background:rgba(230,57,70,.15);border:1px solid #e63946}
+.battle-result h3{color:#fff;margin-bottom:8px}
+.battle-result p{color:#a8dadc;line-height:1.6;font-size:.95em}
+.battle-continue-btn{margin-top:12px;padding:10px 30px;background:#00b4d8;color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:1em;font-family:inherit}
+
+/* World map */
+#worldMap{position:fixed;top:50px;left:0;width:100%;height:calc(100% - 50px);background:radial-gradient(circle,#1a1a2e,#0a0a1a);z-index:150;display:none;flex-direction:column;align-items:center;justify-content:center;overflow-y:auto;padding:30px 0}
+#worldMap.active{display:flex}
+.wm-title{color:#e0e1dd;font-size:2em;margin-bottom:20px;text-shadow:0 0 20px #00b4d8}
+.wm-world{margin-bottom:30px;text-align:center}
+.wm-world-name{color:#ffd166;font-size:1.3em;margin-bottom:12px;font-weight:bold}
+.wm-regions{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;max-width:800px}
+.wr-card{width:130px;height:150px;border-radius:16px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;position:relative}
+.wr-card:hover{transform:scale(1.05);border-color:#00b4d8}
+.wr-card.locked{opacity:.4;cursor:not-allowed}
+.wr-card.cleared{border-color:#06d6a0}
+.wr-card .ri{font-size:40px;margin-bottom:6px}
+.wr-card .rn{color:#e0e1dd;font-size:.85em;font-weight:bold}
+.wr-card .rp{color:#778da9;font-size:.75em;margin-top:4px}
+.wr-card .rl{position:absolute;top:6px;right:8px;font-size:16px}
+.wm-back{margin-top:20px;padding:12px 36px;border:2px solid rgba(255,255,255,.3);background:transparent;color:#e0e1dd;border-radius:30px;cursor:pointer;font-size:1em;font-family:inherit;transition:all .3s}
+.wm-back:hover{border-color:#e63946;color:#e63946}
+
+/* Transition */
+#transition{position:fixed;top:0;left:0;width:100%;height:100%;background:#0a0a1a;z-index:300;display:none;align-items:center;justify-content:center;flex-direction:column}
+#transition.active{display:flex}
+#transition .tt{color:#e0e1dd;font-size:1.8em}
+#transition .ts{color:#778da9;font-size:1em;margin-top:8px}
+
+/* Dialog */
+#dialogBox{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:90%;max-width:600px;background:rgba(0,0,0,.85);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:20px;z-index:100;display:none}
+#dialogBox.active{display:block}
+#dialogBox .dt{color:#e0e1dd;font-size:1.05em;line-height:1.8;white-space:pre-line}
+#dialogBox .dh{color:#778da9;font-size:.85em;margin-top:8px;text-align:right}
+
+/* Mobile */
+#mobileControls{position:fixed;bottom:20px;left:20px;z-index:60;display:none}
+@media(max-width:768px){#mobileControls{display:block}}
+.dpad{display:grid;grid-template-columns:50px 50px 50px;grid-template-rows:50px 50px 50px;gap:4px}
+.dpad-btn{width:50px;height:50px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.dpad-btn:active{background:rgba(0,180,216,.4)}
+.dpad-center{background:none;border:none}
+
+/* Win */
+/* Summary Card */
+#summaryCard{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:300;display:none;flex-direction:column;align-items:center;justify-content:center}
+#summaryCard.active{display:flex}
+.sc-box{background:linear-gradient(135deg,#0d1b2a,#1b263b);border:2px solid rgba(255,255,255,.15);border-radius:24px;padding:36px 48px;max-width:420px;width:90%;text-align:center;box-shadow:0 0 60px rgba(0,180,216,.2)}
+.sc-title{font-size:1.8em;margin-bottom:24px;text-shadow:0 0 20px #00b4d8}
+.sc-stats{display:flex;justify-content:space-around;margin-bottom:28px;gap:12px}
+.sc-stat{text-align:center}
+.sc-stat-val{font-size:2.4em;font-weight:bold;line-height:1.2}
+.sc-stat-label{color:#778da9;font-size:.85em;margin-top:4px}
+.sc-score{margin-bottom:24px;padding:16px;background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.3);border-radius:16px}
+.sc-score-val{font-size:2.6em;color:#ffd166;font-weight:bold}
+.sc-score-label{color:#778da9;font-size:.9em;margin-top:4px}
+.sc-btn{padding:14px 40px;font-size:1.1em;border:2px solid #00b4d8;background:rgba(0,180,216,.15);color:#00b4d8;border-radius:50px;cursor:pointer;font-family:inherit;transition:all .3s}
+.sc-btn:hover{background:#00b4d8;color:#0a0a1a;box-shadow:0 0 30px rgba(0,180,216,.5)}
+
+#winScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle,#1a1a2e,#0a0a1a);z-index:400;display:none;flex-direction:column;align-items:center;justify-content:center}
+#winScreen.active{display:flex}
+#winScreen h1{font-size:3em;color:#ffd166;text-shadow:0 0 30px #ffd166}
+.win-stats{color:#a8dadc;font-size:1.2em;margin:20px 0;line-height:2}
+.win-btn{padding:14px 40px;background:#06d6a0;color:#0a0a1a;border:none;border-radius:30px;font-size:1.1em;cursor:pointer;font-family:inherit;margin-top:20px}
+
+/* === DEBUG PANEL === */
+#debugPanel{position:fixed;bottom:0;left:0;width:100%;height:280px;background:rgba(10,10,26,.95);border-top:2px solid rgba(0,180,216,.4);z-index:9999;display:none;flex-direction:column;font-family:'Consolas','Courier New',monospace;font-size:12px}
+#debugPanel.active{display:flex}
+#debugToolbar{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0;flex-wrap:wrap}
+.dbg-btn{padding:3px 10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#a8dadc;border-radius:4px;cursor:pointer;font-size:11px;font-family:inherit;transition:all .15s}
+.dbg-btn:hover{border-color:#00b4d8;color:#00b4d8}
+.dbg-btn.on{background:rgba(0,180,216,.25);border-color:#00b4d8;color:#00b4d8}
+.dbg-btn.danger{border-color:rgba(230,57,70,.5);color:#e63946}
+.dbg-btn.danger:hover{background:rgba(230,57,70,.2)}
+.dbg-fps{color:#06d6a0;font-weight:bold;margin-left:auto;font-size:13px}
+.dbg-mem{color:#778da9;margin-left:8px;font-size:11px}
+#debugLog{flex:1;overflow-y:auto;padding:4px 12px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+#debugLog::-webkit-scrollbar{width:6px}
+#debugLog::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:3px}
+.dbg-entry{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);line-height:1.5;display:flex;gap:8px}
+.dbg-entry:hover{background:rgba(255,255,255,.03)}
+.dbg-time{color:#555;flex-shrink:0;min-width:70px}
+.dbg-level{flex-shrink:0;min-width:50px;font-weight:bold;text-align:center;border-radius:3px;padding:0 4px}
+.dbg-level.ERROR{color:#e63946;background:rgba(230,57,70,.15)}
+.dbg-level.WARN{color:#ff9f1c;background:rgba(255,159,28,.15)}
+.dbg-level.PERF{color:#06d6a0;background:rgba(6,214,160,.15)}
+.dbg-level.INFO{color:#a8dadc;background:rgba(168,218,220,.15)}
+.dbg-level.TRACE{color:#00b4d8;background:rgba(0,180,216,.15)}
+.dbg-level.STATE{color:#9b59b6;background:rgba(155,89,182,.15)}
+.dbg-tag{color:#778da9;flex-shrink:0;min-width:80px}
+.dbg-msg{color:#e0e1dd;word-break:break-all;flex:1}
+.dbg-data{color:#555;font-size:11px;margin-top:2px;white-space:pre-wrap}
+#debugToggle{position:fixed;bottom:8px;right:8px;z-index:9998;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.7);border:1px solid rgba(0,180,216,.4);color:#00b4d8;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+#debugToggle:hover{background:rgba(0,180,216,.2);transform:scale(1.1)}
+#debugToggle.has-error{border-color:#e63946;color:#e63946;animation:dbgPulse 1.5s infinite}
+@keyframes dbgPulse{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.4)}50%{box-shadow:0 0 0 6px rgba(230,57,70,0)}}
+</style>
+</head>
+<body>
+
+
+
+
+
+<div id="titleScreen">
+  <div class="title-cells" id="titleCells"></div>
+  <h1>🦠 白细胞战士</h1>
+  <h2>人体误区大冒险</h2>
+  <button class="title-btn" onclick="startGame()">开始冒险</button>
+  <button class="title-btn s2" onclick="showControls()">操作说明</button>
+  <div id="controlsInfo" style="display:none;color:#778da9;margin-top:20px;text-align:center;line-height:2">
+    <p>🎮 WASD / 方向键 移动</p><p>📱 手机可用虚拟摇杆</p><p>🔍 走近红色病毒怪兽触发战斗</p><p>❓ 回答正确的医学知识打败误区</p><p>🗺️ ESC 打开世界地图</p>
+  </div>
+</div>
+
+<div id="worldMap">
+  <div class="wm-title">🗺️ 选择探索区域</div>
+  <div id="worldContent"></div>
+  <button class="wm-back" onclick="closeWorldMap()">返回</button>
+</div>
+
+<div id="hud" style="display:none">
+  <div class="hl">
+    <div class="hp-bar"><div class="hp-fill" id="hpFill" style="width:100%"></div><div class="hp-text" id="hpText">100/100</div></div>
+    <div class="hud-lv" id="levelText">Lv.1</div>
+    <div class="xp-bar"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+  </div>
+  <div class="hr">
+    <div class="hud-score" id="scoreText">⭐ 0</div>
+    <div class="hud-region" id="regionText"></div>
+  </div>
+</div>
+
+<div id="minimap"><canvas id="minimapCanvas" width="160" height="160"></canvas></div>
+
+<div id="dialogBox"><div class="dialog-text dt" id="dialogText"></div><div class="dh">点击继续...</div></div>
+
+<div id="mobileControls">
+  <div class="dpad">
+    <div></div><div class="dpad-btn" data-dir="up">▲</div><div></div>
+    <div class="dpad-btn" data-dir="left">◀</div><div class="dpad-center"></div><div class="dpad-btn" data-dir="right">▶</div>
+    <div></div><div class="dpad-btn" data-dir="down">▼</div><div></div>
+  </div>
+</div>
+
+<div id="battleOverlay">
+  <div class="battle-scene">
+    <div class="battle-monster" id="battleEmoji">🦠</div>
+    <div class="battle-monster-name" id="battleMonsterName">误区病毒</div>
+    <div class="battle-progress" id="battleProgress"></div>
+  </div>
+  <div class="battle-question">
+    <div class="battle-misconception" id="battleMisconception"></div>
+    <div class="battle-prompt" id="battlePrompt"></div>
+    <div class="battle-options" id="battleOptions"></div>
+    <div class="battle-result" id="battleResult">
+      <h3 id="resultTitle"></h3>
+      <p id="resultExplain"></p>
+    </div>
+    <button class="battle-continue-btn" id="resultBtn" onclick="battleContinue()" style="display:none">继续</button>
+  </div>
+</div>
+
+<div id="summaryCard">
+  <div class="sc-box">
+    <div class="sc-title" id="scTitle">🎊 区域通关！</div>
+    <div class="sc-stats">
+      <div class="sc-stat">
+        <div class="sc-stat-val" id="scCorrect" style="color:#06d6a0">0</div>
+        <div class="sc-stat-label">✅ 答对</div>
+      </div>
+      <div class="sc-stat">
+        <div class="sc-stat-val" id="scWrong" style="color:#e63946">0</div>
+        <div class="sc-stat-label">❌ 答错</div>
+      </div>
+      <div class="sc-stat">
+        <div class="sc-stat-val" id="scTotal" style="color:#a8dadc">0</div>
+        <div class="sc-stat-label">📊 总题数</div>
+      </div>
+    </div>
+    <div class="sc-score">
+      <div class="sc-score-val" id="scScore">0</div>
+      <div class="sc-score-label">⭐ 本关得分</div>
+    </div>
+    <button class="sc-btn" onclick="closeSummaryCard()">🗺️ 返回世界地图</button>
+  </div>
+</div>
+
+
+<div id="transition"><div class="tt" id="transText"></div><div class="ts" id="transSub"></div></div>
+
+<div id="winScreen">
+  <h1>🎉 全部通关！</h1>
+  <div class="win-stats" id="winStats"></div>
+  <p style="color:#778da9;max-width:500px;text-align:center;line-height:1.8">
+    你已经打败了所有误区病毒，成为真正的白细胞战士！<br>记住：科学知识是最好的免疫系统 💪
+  </p>
+  <button class="win-btn" onclick="location.reload()">再玩一次</button>
+</div>
+
+<!-- DEBUG PANEL -->
+<div id="debugPanel">
+  <div id="debugToolbar">
+    <button class="dbg-btn on" data-filter="ERROR" onclick="Logger.toggleFilter('ERROR',this)">ERROR</button>
+    <button class="dbg-btn on" data-filter="WARN" onclick="Logger.toggleFilter('WARN',this)">WARN</button>
+    <button class="dbg-btn on" data-filter="PERF" onclick="Logger.toggleFilter('PERF',this)">PERF</button>
+    <button class="dbg-btn on" data-filter="TRACE" onclick="Logger.toggleFilter('TRACE',this)">TRACE</button>
+    <button class="dbg-btn on" data-filter="INFO" onclick="Logger.toggleFilter('INFO',this)">INFO</button>
+    <button class="dbg-btn on" data-filter="STATE" onclick="Logger.toggleFilter('STATE',this)">STATE</button>
+    <button class="dbg-btn" onclick="Logger.clear()" style="margin-left:8px">🗑 清空</button>
+    <button class="dbg-btn" onclick="Logger.export()">📥 导出JSON</button>
+    <button class="dbg-btn" onclick="Logger.state('手动快照')">📸 快照</button>
+    <button class="dbg-btn" onclick="Logger.toggle()">✕</button>
+    <span class="dbg-fps" id="dbgFps">-- FPS</span>
+    <span class="dbg-mem" id="dbgMem"></span>
+  </div>
+  <div id="debugLog"></div>
+</div>
+<button id="debugToggle" onclick="Logger.toggle()" title="Debug Panel (Ctrl+Shift+D)">🐛</button>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+// ============================
+// LOGGER — 开发者调试日志工具
+// ============================
+const Logger={
+  entries:[],maxEntries:500,panel:null,logEl:null,fpsEl:null,memEl:null,
+  filters:new Set(['ERROR','WARN','INFO','PERF','TRACE','STATE']),
+  _fps:{frames:0,last:performance.now(),current:0},
+  _errCount:0,
+
+  init(){
+    this.panel=document.getElementById('debugPanel');
+    this.logEl=document.getElementById('debugLog');
+    this.fpsEl=document.getElementById('dbgFps');
+    this.memEl=document.getElementById('dbgMem');
+    // 全局错误捕获
+    window.onerror=(msg,src,line,col,err)=>{
+      this.error(`[window] ${msg}`,err||{stack:`${src}:${line}:${col}`});
+    };
+    window.addEventListener('unhandledrejection',e=>{
+      this.error('[Promise] '+e.reason,e.reason);
+    });
+    // 拦截 console.error/warn
+    const _origErr=console.error.bind(console),_origWarn=console.warn.bind(console);
+    console.error=(...args)=>{_origErr(...args);this.error('[console]',args.join(' '))};
+    console.warn=(...args)=>{_origWarn(...args);this.warn('[console]',args.join(' '))};
+    // 快捷键 Ctrl+Shift+D 或 Ctrl+`
+    document.addEventListener('keydown',e=>{
+      if((e.ctrlKey&&e.shiftKey&&e.key==='D')||(e.ctrlKey&&e.key==='`')){e.preventDefault();this.toggle()}
+    });
+    this.info('Logger','初始化完成 — Ctrl+Shift+D 或 Ctrl+` 切换面板');
+  },
+
+  log(level,tag,msg,data){
+    const now=new Date();
+    const ts=now.toTimeString().slice(0,8)+'.'+String(now.getMilliseconds()).padStart(3,'0');
+    const entry={ts,level,tag,msg,data,time:Date.now()};
+    this.entries.push(entry);
+    if(this.entries.length>this.maxEntries){this.entries.shift();if(this.logEl&&this.logEl.firstChild)this.logEl.removeChild(this.logEl.firstChild)}
+    if(level==='ERROR')this._errCount++;
+    this._render(entry);
+    // 错误闪烁指示
+    if(this.panel){const btn=document.getElementById('debugToggle');if(btn&&this._errCount>0&&!this.panel.classList.contains('active'))btn.classList.add('has-error')}
+    // 远程上报 ERROR/WARN/INFO 到服务器日志文件
+    if(level==='ERROR'||level==='WARN'||level==='INFO'){
+      try{fetch('/api/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level,tag,msg,data:data?JSON.stringify(data):''})})}catch(e){}
+    }
+  },
+
+  _render(entry){
+    if(!this.logEl||!this.filters.has(entry.level))return;
+    const div=document.createElement('div');div.className='dbg-entry';
+    let html=`<span class="dbg-time">${entry.ts}</span><span class="dbg-level ${entry.level}">${entry.level}</span><span class="dbg-tag">${entry.tag}</span><span class="dbg-msg">${this._esc(entry.msg)}</span>`;
+    if(entry.data!==undefined&&entry.data!==null){
+      const ds=typeof entry.data==='object'?JSON.stringify(entry.data,null,0):String(entry.data);
+      if(ds.length<200)html+=`<span class="dbg-data">${this._esc(ds)}</span>`;
+    }
+    div.innerHTML=html;
+    this.logEl.appendChild(div);
+    // 自动滚动到底部
+    if(this.logEl.scrollHeight-this.logEl.scrollTop-this.logEl.clientHeight<60){
+      this.logEl.scrollTop=this.logEl.scrollHeight;
+    }
+  },
+
+  _esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')},
+
+  // 便捷方法
+  error(msg,err){this.log('ERROR','Error',msg,err?(err.stack||err.message||err):'')},
+  warn(msg,data){this.log('WARN','Warn',msg,data)},
+  info(tag,msg,data){this.log('INFO',tag,msg,data)},
+  perf(label,ms){this.log('PERF',label,`${ms.toFixed(2)}ms`)},
+  trace(fn,args){this.log('TRACE',fn,args||'')},
+  state(label){
+    const snap={
+      screen:S.screen,player:{hp:S.player.hp,xp:S.player.xp,lv:S.player.level,score:S.player.score,x:Math.round(S.player.x),y:Math.round(S.player.y)},
+      world:S.currentWorld,region:S.currentRegion,
+      map:S.currentMap?{monsters:S.currentMap.monsters.length,w:S.currentMap.mapW,h:S.currentMap.mapH}:null,
+      defeated:Object.keys(S.monstersDefeated).length,
+      cleared:Object.keys(S.regionsCleared).length
+    };
+    this.log('STATE',label||'State',snap);
+  },
+
+  // FPS 统计
+  tick(){
+    this._fps.frames++;
+    const now=performance.now();
+    if(now-this._fps.last>=1000){
+      this._fps.current=this._fps.frames;
+      this._fps.frames=0;this._fps.last=now;
+      if(this.fpsEl)this.fpsEl.textContent=this._fps.current+' FPS';
+      if(this.fpsEl)this.fpsEl.style.color=this._fps.current>=50?'#06d6a0':this._fps.current>=30?'#ff9f1c':'#e63946';
+      // 内存（仅 Chrome）
+      if(performance.memory&&this.memEl){
+        const mb=(performance.memory.usedJSHeapSize/1048576).toFixed(1);
+        this.memEl.textContent=`${mb}MB`;
+      }
+    }
+  },
+
+  // 筛选
+  toggleFilter(level,btn){
+    if(this.filters.has(level)){this.filters.delete(level);btn.classList.remove('on')}
+    else{this.filters.add(level);btn.classList.add('on')}
+    this._rerender();
+  },
+  _rerender(){
+    if(!this.logEl)return;
+    this.logEl.innerHTML='';
+    for(const e of this.entries){this._render(e)}
+  },
+
+  // 清空
+  clear(){this.entries=[];if(this.logEl)this.logEl.innerHTML='';this._errCount=0;const btn=document.getElementById('debugToggle');if(btn)btn.classList.remove('has-error')},
+
+  // 导出
+  export(){
+    if(!this.entries.length){console.log('Logger: no entries to export');return}
+    const json=JSON.stringify(this.entries,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`debug-log-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+    a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },
+
+  // 显示/隐藏
+  toggle(){
+    if(!this.panel)return;
+    this.panel.classList.toggle('active');
+    if(this.panel.classList.contains('active')){
+      this._errCount=0;const btn=document.getElementById('debugToggle');if(btn)btn.classList.remove('has-error');
+      if(this.logEl)this.logEl.scrollTop=this.logEl.scrollHeight;
+    }
+  }
+};
+
+// ============================
+// AUDIO
+// ============================
+const AudioCtx=window.AudioContext||window.webkitAudioContext;
+let audioCtx;
+function initAudio(){if(!audioCtx)audioCtx=new AudioCtx()}
+function playSound(type){
+  if(!audioCtx)return;
+  const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  osc.connect(gain);gain.connect(audioCtx.destination);
+  const t=audioCtx.currentTime;
+  if(type==='correct'){osc.type='sine';osc.frequency.setValueAtTime(523,t);osc.frequency.setValueAtTime(659,t+.1);osc.frequency.setValueAtTime(784,t+.2);gain.gain.setValueAtTime(.25,t);gain.gain.exponentialRampToValueAtTime(.01,t+.4);osc.start(t);osc.stop(t+.4)}
+  else if(type==='wrong'){osc.type='sawtooth';osc.frequency.setValueAtTime(200,t);osc.frequency.exponentialRampToValueAtTime(100,t+.3);gain.gain.setValueAtTime(.2,t);gain.gain.exponentialRampToValueAtTime(.01,t+.3);osc.start(t);osc.stop(t+.3)}
+  else if(type==='defeat'){osc.type='sine';[523,659,784,1047].forEach((f,i)=>{osc.frequency.setValueAtTime(f,t+i*.12)});gain.gain.setValueAtTime(.3,t);gain.gain.exponentialRampToValueAtTime(.01,t+.6);osc.start(t);osc.stop(t+.6)}
+  else if(type==='encounter'){osc.type='sawtooth';osc.frequency.setValueAtTime(150,t);osc.frequency.setValueAtTime(200,t+.15);osc.frequency.setValueAtTime(150,t+.3);gain.gain.setValueAtTime(.15,t);gain.gain.exponentialRampToValueAtTime(.01,t+.5);osc.start(t);osc.stop(t+.5)}
+  else if(type==='levelup'){osc.type='sine';[523,659,784,1047,1319].forEach((f,i)=>{osc.frequency.setValueAtTime(f,t+i*.1)});gain.gain.setValueAtTime(.25,t);gain.gain.exponentialRampToValueAtTime(.01,t+.7);osc.start(t);osc.stop(t+.7)}
+  else if(type==='step'){osc.type='sine';osc.frequency.setValueAtTime(180+Math.random()*40,t);gain.gain.setValueAtTime(.03,t);gain.gain.exponentialRampToValueAtTime(.001,t+.05);osc.start(t);osc.stop(t+.05)}
+}
+
+let bgmSource=null;
+function startBGM(){
+  if(!audioCtx)return;
+  const sr=audioCtx.sampleRate,bpm=92,beatLen=60/bpm,barLen=beatLen*4,bars=8;
+  const totalSec=barLen*bars,totalSamples=Math.ceil(sr*totalSec);
+  const buf=audioCtx.createBuffer(2,totalSamples,sr);
+  const L=buf.getChannelData(0),R=buf.getChannelData(1);
+  function addOsc(freq,type,gainFn,startBeat,durBeats,detune){
+    const startS=Math.floor(startBeat*beatLen*sr),durS=Math.floor(durBeats*beatLen*sr),phase=Math.random()*Math.PI*2;
+    for(let i=0;i<durS&&startS+i<totalSamples;i++){
+      const t=i/sr,g=gainFn(t,durBeats*beatLen);if(g<.0001)continue;
+      const f=freq*Math.pow(2,(detune||0)/1200);
+      let v;if(type==='sine')v=Math.sin(2*Math.PI*f*t+phase);
+      else if(type==='triangle')v=2*Math.abs(2*(f*t%1)-1)-1;
+      else v=Math.sin(2*Math.PI*f*t+phase);
+      const idx=startS+i;if(idx<totalSamples){L[idx]+=v*g;R[idx]+=v*g}
+    }
+  }
+  const envPluck=(t,d)=>t<.01?t/.01:Math.max(0,Math.exp(-3*(t-.01)/d));
+  const envPerc=(t,d)=>t<.005?t/.005:Math.max(0,Math.exp(-8*t));
+  const envADSR=(t,d)=>{const a=.01,dd=.05,s=.6,r=.1;if(t<a)return t/a;if(t<a+dd)return 1-(1-s)*((t-a)/dd);if(t<d-r)return s;return s*(d-t)/r};
+  const chords=[[261.6,329.6,392],[392,493.9,587.3],[329.6,392,493.9],[261.6,349.2,440],[261.6,329.6,392],[392,493.9,587.3],[349.2,440,523.3],[261.6,329.6,392]];
+  const bassNotes=[130.8,196,220,174.6,130.8,196,174.6,130.8];
+  for(let bar=0;bar<bars;bar++){
+    const chord=chords[bar],baseBeat=bar*4;
+    for(const freq of chord){addOsc(freq,'sine',(t,d)=>envADSR(t,d)*.12,baseBeat,4,0);addOsc(freq,'triangle',(t,d)=>envADSR(t,d)*.06,baseBeat,4,8)}
+    const arpSeq=[chord[0],chord[1],chord[2],chord[1]*2,chord[2],chord[1],chord[0],chord[0]*2,chord[0],chord[1],chord[2],chord[1]*2,chord[2],chord[1],chord[0]*2,chord[2]*2];
+    for(let i=0;i<16;i++){const beat=baseBeat+i*.25;addOsc(arpSeq[i],'sine',(t,d)=>envPluck(t,d)*.09,beat,.25,0);addOsc(arpSeq[i]*2,'sine',(t,d)=>envPluck(t,d)*.03,beat,.2,5)}
+    addOsc(bassNotes[bar],'triangle',(t,d)=>envPluck(t,d)*.18,baseBeat,1.5,0);addOsc(bassNotes[bar],'triangle',(t,d)=>envPluck(t,d)*.18,baseBeat+2,1.5,0);
+    for(let b=0;b<4;b++){const kb=baseBeat+b;addOsc(150,'sine',(t)=>{const f2=150*Math.exp(-30*t);return Math.sin(2*Math.PI*f2*t)*envPerc(t,.15)*.35},kb,.15,0);addOsc(60,'sine',(t)=>envPerc(t,.1)*.25,kb,.1,0);for(let h=0;h<2;h++){const hb=kb+h*.5;addOsc(300,'triangle',(t)=>envPerc(t,.06)*.04,hb,.06,0)}}
+    if(bar%2===0){const melody=[chord[2]*2,chord[1]*2,chord[0]*2,chord[1]*2,chord[2]*2,chord[0]*4,chord[1]*2,chord[2]*2];for(let i=0;i<8;i++)addOsc(melody[i],'sine',(t,d)=>envPluck(t,d)*.07,baseBeat+i*.5,.48,0)}
+  }
+  let maxV=0;for(let i=0;i<totalSamples;i++)maxV=Math.max(maxV,Math.abs(L[i]),Math.abs(R[i]));
+  const ng=maxV>0?.7/maxV:1;for(let i=0;i<totalSamples;i++){L[i]*=ng;R[i]*=ng}
+  bgmSource=audioCtx.createBufferSource();bgmSource.buffer=buf;bgmSource.loop=true;bgmSource.connect(audioCtx.destination);bgmSource.start();
+}
+function stopBGM(){if(bgmSource){try{bgmSource.stop()}catch(e){}bgmSource=null}}
+
+// ============================
+// ENGINE
+// ============================
+const canvas=document.getElementById('gameCanvas'),ctx=canvas.getContext('2d');
+const W=()=>window.innerWidth,H=()=>window.innerHeight;
+canvas.width=W();canvas.height=H();
+window.addEventListener('resize',()=>{canvas.width=W();canvas.height=H()});
+
+const S={screen:'title',player:{x:400,y:300,speed:3,hp:100,maxHp:100,xp:0,maxXp:100,level:1,score:0,facing:'down'},
+  currentWorld:0,currentRegion:null,regionsCleared:{},monstersDefeated:{},keys:{},camera:{x:0,y:0},
+  animFrame:0,particles:[],damageNumbers:[],battleData:null,touchDir:{x:0,y:0},regionQuestions:[],qIndex:0,correctCount:0,wrongCount:0};
+
+// ============================
+// SHUFFLE HELPER
+// ============================
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+// ============================
+// WORLD & REGION DATA
+// ============================
+const WORLDS=[
+  {id:'body',name:'🏥 身体探秘',desc:'探索人体五大器官系统',regions:['stomach','heart','lungs','brain','liver']},
+  {id:'life',name:'💊 疾病百科',desc:'神经系统、代谢病、皮肤病、骨科、传染病',regions:['life_daily','life_food','life_skin','life_exercise','life_season']},
+  {id:'firstaid',name:'🚑 急救安全',desc:'关键时刻的救命知识',regions:['fa_cpr','fa_burn','fa_trauma','fa_poison','fa_fracture']},
+  {id:'senses',name:'👁️ 五官世界',desc:'眼耳鼻口腔咽喉的医学误区',regions:['eye_vision','ear_hearing','nose_sinuses','oral_dental','throat_voice']},
+  {id:'maternal',name:'👶 母婴健康',desc:'孕期、产科、儿科发育知识',regions:['ob_pregnancy','ob_delivery','neo_newborn','ped_common','ped_growth']}
+];
+
+const REGIONS={
+  stomach:{name:'消化道迷宫',icon:'🫁',color:'#ff9f1c',bgColor:'#2a1a0a'},
+  heart:{name:'心脏动力室',icon:'❤️',color:'#e63946',bgColor:'#2a0a0a'},
+  lungs:{name:'肺泡森林',icon:'🫁',color:'#06d6a0',bgColor:'#0a2a1a'},
+  brain:{name:'神经中枢塔',icon:'🧠',color:'#7b2cbf',bgColor:'#1a0a2a'},
+  liver:{name:'肝脏净化站',icon:'🫘',color:'#ff6b6b',bgColor:'#2a0a0a'},
+  life_daily:{name:'睡眠与神经',icon:'😴',color:'#ffd166',bgColor:'#1a1a0a'},
+  life_food:{name:'营养代谢病',icon:'🩺',color:'#06d6a0',bgColor:'#0a1a0a'},
+  life_skin:{name:'皮肤科疾病',icon:'🔬',color:'#ff9f1c',bgColor:'#1a1200'},
+  life_exercise:{name:'骨科运动医',icon:'🦴',color:'#00b4d8',bgColor:'#0a0a2a'},
+  life_season:{name:'季节性疾病',icon:'🌡️',color:'#e63946',bgColor:'#1a0a0a'},
+  fa_cpr:{name:'心肺复苏',icon:'🫀',color:'#e63946',bgColor:'#2a0a0a'},
+  fa_burn:{name:'烧烫伤处理',icon:'🔥',color:'#ff9f1c',bgColor:'#2a1a0a'},
+  fa_trauma:{name:'外伤止血',icon:'🩹',color:'#06d6a0',bgColor:'#0a1a0a'},
+  fa_poison:{name:'中毒急救',icon:'☠️',color:'#7b2cbf',bgColor:'#1a0a2a'},
+  fa_fracture:{name:'骨折处理',icon:'🦴',color:'#a8dadc',bgColor:'#0a1a1a'},
+  eye_vision:{name:'视觉障碍',icon:'👁️',color:'#00b4d8',bgColor:'#0a0a2a'},
+  ear_hearing:{name:'听觉系统',icon:'👂',color:'#ffd166',bgColor:'#1a1a0a'},
+  nose_sinuses:{name:'鼻与鼻窦',icon:'👃',color:'#ff9f1c',bgColor:'#1a1200'},
+  oral_dental:{name:'口腔健康',icon:'🦷',color:'#f0f0f0',bgColor:'#1a1a1a'},
+  throat_voice:{name:'咽喉发声',icon:'🗣️',color:'#e63946',bgColor:'#2a0a0a'},
+  ob_pregnancy:{name:'孕期保健',icon:'🤰',color:'#ff9f1c',bgColor:'#1a1200'},
+  ob_delivery:{name:'分娩产褥',icon:'🍼',color:'#06d6a0',bgColor:'#0a1a0a'},
+  neo_newborn:{name:'新生儿科',icon:'👶',color:'#ffd166',bgColor:'#1a1a0a'},
+  ped_common:{name:'儿科常见病',icon:'🤒',color:'#00b4d8',bgColor:'#0a0a2a'},
+  ped_growth:{name:'儿童发育',icon:'📈',color:'#7b2cbf',bgColor:'#1a0a2a'}
+};
+
+// ============================
+// QUESTION BANK (10 per region)
+// ============================
+const Q={
+  stomach:[
+    {m:'"饭后立刻运动会导致阑尾炎"',q:'关于饭后运动，哪个说法正确？',o:['饭后剧烈运动可能导致胃痉挛，但不会导致阑尾炎','阑尾炎是食物残渣堵塞阑尾引起的','饭后立即运动完全没有问题','阑尾炎和运动有直接因果关系'],c:0,e:'阑尾炎是阑尾腔内粪石或淋巴组织增生导致堵塞发炎，和饭后运动无关。但饭后剧烈运动确实可能导致胃痉挛、恶心等不适。',s:'《外科学》第9版'},
+    {m:'"喝柠檬水能中和胃酸治胃病"',q:'关于柠檬水和胃，哪个正确？',o:['柠檬水是酸性的，可能刺激胃黏膜','柠檬水确实是碱性的可以中和胃酸','柠檬水对胃完全没有影响','所有酸性食物都会导致胃溃疡'],c:0,e:'柠檬含柠檬酸，虽有"碱性食物"说法，但对胃病患者可能刺激胃酸分泌加重症状。胃病应遵医嘱。',s:'中华医学会消化病学分会'},
+    {m:'"食物在胃里只需2小时就能完全消化"',q:'食物消化时间，哪个正确？',o:['不同食物消化时间差异很大，固体食物通常4-6小时','所有食物都只需2小时','食物在胃里只需要30分钟','食物需要24小时才能消化'],c:0,e:'消化时间因食物类型而异：水10-20分钟，碳水1-2小时，蛋白质3-4小时，脂肪4-6小时。',s:'《生理学》第9版'},
+    {m:'"吃饭时喝水会稀释胃液影响消化"',q:'关于吃饭喝水，哪个正确？',o:['适量饮水不会显著稀释胃液，反而有助消化','吃饭时绝对不能喝水','喝水会完全破坏胃酸','饭后才能喝水'],c:0,e:'胃液分泌会根据食物和饮水量自动调节浓度。适量饮水有助食物软化和蠕动，不会显著影响消化功能。',s:'《消化病学》/ Mayo Clinic'},
+    {m:'"空腹不能吃香蕉"',q:'关于空腹吃香蕉，哪个正确？',o:['健康人空腹吃香蕉完全没问题','空腹吃香蕉会导致心脏骤停','香蕉必须饭后1小时才能吃','空腹吃香蕉会得肾结石'],c:0,e:'香蕉含钾和镁，但正常食用量远不会达到危险水平。健康人空腹吃香蕉没有问题。',s:'WHO膳食指南'},
+    {m:'"食物掉地上5秒内捡起来还能吃"',q:'关于"5秒规则"，哪个正确？',o:['细菌会在食物接触地面瞬间转移，5秒规则没有科学依据','5秒内捡起来确实没有细菌','只有潮湿地面才有细菌','干燥地面永远不会转移细菌'],c:0,e:'研究表明细菌转移在接触瞬间即可发生。地面细菌种类和数量才是关键，5秒规则不靠谱。',s:'Rutgers大学研究 (2016)'},
+    {m:'"细嚼慢咽能帮助减肥"',q:'关于进食速度，哪个正确？',o:['细嚼慢咽确实有助减少进食量，因为饱腹信号需要时间传递','吃饭速度和体重完全无关','吃得越快消化越好','只有运动才能减肥'],c:0,e:'大脑接收饱腹信号需要约20分钟。细嚼慢咽能让身体更及时感知饱腹，自然减少摄入量。',s:'《肥胖研究》期刊'},
+    {m:'"胃溃疡主要是吃辣引起的"',q:'关于胃溃疡成因，哪个正确？',o:['幽门螺杆菌感染和NSAIDs药物是胃溃疡主因','胃溃疡完全是吃辣导致的','只有老年人才会得胃溃疡','胃溃疡和饮食完全无关'],c:0,e:'胃溃疡主要由幽门螺杆菌(Hp)感染和长期服用非甾体抗炎药(如阿司匹林)引起，辛辣食物可能加重症状但不是主因。',s:'《内科学》第9版'},
+    {m:'"益生菌能治所有肠道疾病"',q:'关于益生菌，哪个正确？',o:['益生菌对某些肠道问题有帮助但不能治所有病','益生菌是万能的肠道药物','益生菌完全没有用','所有益生菌效果都一样'],c:0,e:'益生菌对部分腹泻、肠易激综合征等有辅助作用，但不是万能药。不同菌株效果不同，需在医生指导下使用。',s:'中华医学会微生态学分会'},
+    {m:'"每天必须排便一次才算正常"',q:'关于排便频率，哪个正确？',o:['正常排便频率范围是每天3次到每周3次','必须每天排便一次','一周排便一次也正常','排便频率固定不变'],c:0,e:'排便频率因人而异，每天3次到每周3次都属正常范围。关键看粪便性状和排便是否困难。',s:'《胃肠病学》/ Rome IV标准'}
+  ],
+  heart:[
+    {m:'"静脉血是蓝色的"',q:'关于血液颜色，哪个正确？',o:['静脉血是暗红色，血液从来不是蓝色的','静脉血确实是蓝色的','所有血液都是同样的红色','血液颜色取决于肤色'],c:0,e:'静脉血因含脱氧血红蛋白呈暗红色。教科书用蓝色标注静脉只为区分。',s:'《生理学》第9版'},
+    {m:'"运动会让心脏更快用完心跳次数"',q:'关于心跳次数，哪个正确？',o:['运动增强心肌功能，静息心率降低，心脏更健康','心跳总数是固定的所以不要运动','运动对心脏没有影响','心脏每天只能跳10万次'],c:0,e:'经常运动的人静息心率更低（运动员可低至40-50次/分），心脏效率更高。',s:'美国心脏协会(AHA)'},
+    {m:'"高血压是老年病，年轻人不会得"',q:'关于高血压，哪个正确？',o:['高血压有年轻化趋势，不良生活习惯可导致青年高血压','只有60岁以上才会得','年轻人血压高不需要治疗','高血压完全由遗传决定'],c:0,e:'近年高血压呈明显年轻化趋势。熬夜、高盐饮食、缺乏运动等都可能导致年轻人血压升高。',s:'《中国高血压防治指南》2024'},
+    {m:'"献血会导致贫血"',q:'关于献血，哪个正确？',o:['按规定献血不会导致贫血，骨髓会加速造血补充','每次献血都会导致贫血','献血后需要卧床一个月','女性不能献血'],c:0,e:'人体血液有自我再生能力。每次献血200-400ml，骨髓会在几周内补充。按规定频率献血不会贫血。',s:'《中华人民共和国献血法》/ WHO'},
+    {m:'"心脏在左边，所以要左侧卧睡"',q:'关于心脏位置，哪个正确？',o:['心脏大部分在胸腔中央偏左，各种睡姿都可以','心脏完全在左侧','右侧卧会压迫心脏','必须左侧卧才能保护心脏'],c:0,e:'心脏位于胸腔中央偏左，被胸骨和肋骨保护。正常人各种睡姿都不会影响心脏功能。',s:'《系统解剖学》'},
+    {m:'"只有老年人才会得冠心病"',q:'关于冠心病，哪个正确？',o:['冠心病有年轻化趋势，不良生活习惯是重要诱因','冠心病是纯老年疾病','年轻人血管完全不会有斑块','冠心病只和遗传有关'],c:0,e:'动脉粥样硬化可从青少年时期开始。高血脂、吸烟、久坐等加速进程，近年30-40岁冠心病患者增多。',s:'《内科学》第9版'},
+    {m:'"量血压只看高压就行"',q:'关于血压测量，哪个正确？',o:['收缩压和舒张压都重要，脉压差也有临床意义','只要高压正常就没问题','低压比高压重要','血压只测一次就够'],c:0,e:'收缩压(高压)和舒张压(低压)都有诊断意义。脉压差过大或过小都可能提示心血管问题。',s:'《诊断学》/ 高血压指南'},
+    {m:'"胆固醇越低越好"',q:'关于胆固醇，哪个正确？',o:['胆固醇过高过低都不好，它是细胞膜和激素的重要原料','胆固醇完全是有害物质','越低越健康','饮食不影响胆固醇'],c:0,e:'胆固醇是细胞膜、维生素D和多种激素的原料。过低(＜3.0mmol/L)可能增加出血性卒中风险。',s:'《内科学》/ AHA指南'},
+    {m:'"心跳快说明心脏有问题"',q:'关于心率快慢，哪个正确？',o:['心率受情绪、运动、咖啡因等多种因素影响，不一定说明有问题','心跳快就是心脏病','心跳越慢越健康','心率和健康无关'],c:0,e:'正常心率60-100次/分，运动、紧张、咖啡因等都会暂时加速。持续异常才需就医。',s:'《诊断学》'},
+    {m:'"心脏支架手术后就不用吃药了"',q:'关于心脏支架，哪个正确？',o:['支架术后必须遵医嘱长期服药预防血栓','装了支架就彻底好了','支架会被身体吸收','术后不用复查'],c:0,e:'支架是金属异物，术后需长期服用抗血小板药物(如阿司匹林+氯吡格雷)防止支架内血栓形成。',s:'中华医学会心血管病学分会'}
+  ],
+  lungs:[
+    {m:'"冬天不戴口罩会冻伤肺"',q:'关于冷空气和肺，哪个正确？',o:['鼻腔和气管会将空气加温至接近体温后到达肺部','冷空气会直接冻伤肺组织','冬天不应该用鼻子呼吸','肺对温度完全不敏感'],c:0,e:'鼻腔和上呼吸道有强大加温加湿功能，即使-20°C空气到达气管下段时已接近37°C。',s:'《呼吸病学》'},
+    {m:'"吸纯氧对人更有益"',q:'关于氧气，哪个正确？',o:['长时间高浓度氧会导致氧中毒，损伤肺和神经系统','纯氧完全无害','正常人需要每天吸氧','氧气浓度越高越精神'],c:0,e:'氧中毒是真实危险。长时间吸入>60%氧会导致肺泡损伤和中枢神经损害。正常呼吸21%氧气即可。',s:'《急诊与灾难医学》'},
+    {m:'"咳嗽不治会变成肺炎"',q:'关于咳嗽和肺炎，哪个正确？',o:['咳嗽是保护性反射，肺炎是感染引起的，不是咳出来的','所有咳嗽都必须止咳','咳嗽不治疗一定会变肺炎','止咳药能预防肺炎'],c:0,e:'咳嗽是呼吸道保护性反射。肺炎由病原体感染引起，盲目止咳反而可能妨碍排痰。',s:'《内科学》第9版'},
+    {m:'"打鼾说明睡得香"',q:'关于打鼾，哪个正确？',o:['严重打鼾可能是睡眠呼吸暂停综合征，需要就医','打鼾就是睡得好','打鼾对健康没有任何影响','只有胖人才打鼾'],c:0,e:'严重打鼾伴呼吸暂停可能是阻塞性睡眠呼吸暂停(OSA)，导致间歇性缺氧，增加心血管风险。',s:'《睡眠医学》'},
+    {m:'"PM2.5对肺的影响是暂时的"',q:'关于PM2.5，哪个正确？',o:['长期暴露PM2.5可导致慢阻肺、肺癌等不可逆损伤','PM2.5只影响有肺病的人','PM2.5的影响24小时内就消失','口罩完全不能过滤PM2.5'],c:0,e:'PM2.5可深入肺泡并进入血液循环。长期暴露增加COPD、肺癌、心血管疾病风险。',s:'WHO空气质量指南'},
+    {m:'"感冒是因为着凉引起的"',q:'关于感冒的原因，哪个正确？',o:['感冒由病毒引起，着凉只是降低免疫力增加感染风险','感冒完全由着凉引起','冷空气直接导致感冒','感冒和免疫系统无关'],c:0,e:'感冒由鼻病毒、冠状病毒等引起。寒冷使鼻腔血管收缩降低局部免疫力，间接增加感染概率。',s:'《内科学》/ CDC'},
+    {m:'"肺活量大说明肺功能好"',q:'关于肺活量，哪个正确？',o:['肺活量是肺功能指标之一，但不是唯一指标','肺活量等于肺功能','肺活量不可训练','老年人肺活量和年轻人一样'],c:0,e:'肺功能评估需综合FEV1、FVC、FEV1/FVC等多项指标。肺活量只是其中之一。',s:'《肺功能检查指南》'},
+    {m:'"二手烟比一手烟危害小"',q:'关于二手烟，哪个正确？',o:['二手烟含更高浓度致癌物，对非吸烟者危害极大','二手烟完全无害','二手烟比一手烟危害更大','室外二手烟立刻消散无害'],c:0,e:'二手烟含7000+化学物质，其中70+为致癌物。因无过滤，某些有害物浓度比主流烟更高。',s:'WHO / 美国卫生总监报告'},
+    {m:'"哮喘患者不能运动"',q:'关于哮喘和运动，哪个正确？',o:['适当运动可以增强心肺功能，但需在医生指导下进行','哮喘患者完全不能运动','运动一定会诱发哮喘','哮喘患者只适合卧床'],c:0,e:'运动性哮喘可通过热身、使用预防药物等方式管理。游泳等运动反而有助改善肺功能。',s:'GINA全球哮喘防治指南'},
+    {m:'"雾霾天戴普通口罩就行"',q:'关于防霾口罩，哪个正确？',o:['需佩戴N95/KN95级别口罩才能有效过滤PM2.5','普通棉布口罩能防PM2.5','纱布口罩和N95效果一样','只有老年人才需要戴口罩'],c:0,e:'普通口罩孔径远大于PM2.5，需N95/KN95级别才能有效过滤。且需正确佩戴贴合面部。',s:'《呼吸防护用品》国家标准'}
+  ],
+  brain:[
+    {m:'"人类只使用了大脑的10%"',q:'关于大脑使用率，哪个正确？',o:['脑成像研究表明人类使用了大脑的绝大部分区域','确实只有10%在工作','爱因斯坦用了20%所以聪明','剩下90%是备用的'],c:0,e:'fMRI显示24小时内人类使用了大脑几乎所有区域。"10%神话"无神经科学证据。',s:'Nature Reviews Neuroscience'},
+    {m:'"做梦说明睡眠质量差"',q:'关于做梦，哪个正确？',o:['做梦是REM睡眠的正常组成部分，对记忆巩固很重要','做梦是睡眠差的表现','正常人不应该做梦','只有心理有问题的人才做梦'],c:0,e:'每晚做4-6次梦是正常的。REM睡眠对记忆整合、情绪处理和创造性思维至关重要。',s:'《睡眠医学》'},
+    {m:'"左脑管逻辑，右脑管创意"',q:'关于左右脑，哪个正确？',o:['大脑两个半球协同工作，功能划分远比"左右脑"说法复杂','确实可以分左脑型和右脑型','左脑完全不参与创意','右脑完全不参与逻辑'],c:0,e:'2013年PLOS ONE研究涵盖1000+大脑扫描，无证据支持"左脑型"或"右脑型"人格。',s:'PLOS ONE (2013)'},
+    {m:'"记忆力随年龄必然严重下降"',q:'关于年龄和记忆，哪个正确？',o:['虽然某些记忆会减退，但持续学习可有效延缓衰退','年龄大了一定会健忘','老年人无法学习新知识','记忆力20岁后就开始衰退'],c:0,e:'大脑具有终身可塑性。持续学习、社交、运动可显著延缓认知衰退。',s:'《神经科学》/ WHO老龄化报告'},
+    {m:'"听莫扎特音乐能变聪明"',q:'关于"莫扎特效应"，哪个正确？',o:['原始研究仅发现短暂空间推理提升，不能让人变聪明','听莫扎特真的能提高智商','只有古典音乐对大脑有益','听音乐完全不影响大脑'],c:0,e:'1993年研究仅发现听莫扎特后15分钟内空间推理小幅提升，后续研究未能可靠复制。',s:'Nature (1999)'},
+    {m:'"成年人不能长出新的脑细胞"',q:'关于神经再生，哪个正确？',o:['海马体等区域终身可产生新神经元','成年后脑细胞只减不增','大脑神经元总数固定不变','只有儿童期才有神经再生'],c:0,e:'成人海马体齿状回终身可产生新神经元（神经发生），运动、学习、睡眠可促进此过程。',s:'Nature Medicine (2019)'},
+    {m:'"人只有五种感觉"',q:'关于人类感官，哪个正确？',o:['人类有超过5种感觉，包括平衡觉、本体觉、温度觉等','确实只有视觉听觉嗅觉味觉触觉五种','只有动物才有第六感','人类感官不可训练'],c:0,e:'人类至少有9-20种感觉，包括前庭觉（平衡）、本体觉（身体位置）、温度觉、痛觉等。',s:'《神经科学原理》'},
+    {m:'"智力完全由基因决定"',q:'关于智力因素，哪个正确？',o:['智力受基因和环境共同影响，教育、营养、刺激都很重要','智力100%由基因决定','智力无法改变','营养对智力没有影响'],c:0,e:'双胞胎研究显示智力遗传率约50%，另50%受教育、营养、社会环境等影响。',s:'《行为遗传学》'},
+    {m:'"手机辐射会导致脑瘤"',q:'关于手机辐射，哪个正确？',o:['目前大规模研究未发现手机使用与脑瘤的因果关系','手机辐射一定会导致脑瘤','手机辐射比微波炉强','完全不用担忧手机辐射'],c:0,e:'WHO/IARC将射频电磁场列为2B类"可能致癌物"，但大规模前瞻性研究未发现因果关系。',s:'JNCI (2022) / IARC'},
+    {m:'"头痛就是脑子在痛"',q:'关于头痛，哪个正确？',o:['大脑本身无痛觉神经，头痛来自血管、脑膜或肌肉的痛觉信号','大脑本身有痛觉','所有头痛都是同一种原因','头痛不需要关注'],c:0,e:'脑实质无痛觉感受器。头痛来自颅内外血管、脑膜、头皮肌肉等组织的痛觉信号。',s:'《神经病学》第9版'}
+  ],
+  liver:[
+    {m:'"肝脏需要定期排毒，排毒产品能清洁肝脏"',q:'关于肝脏排毒，哪个正确？',o:['肝脏本身就是解毒器官，健康肝脏不需要额外排毒产品','排毒产品确实能清洁肝脏','肝脏每月需要排毒一次','肝脏不能自己解毒'],c:0,e:'肝脏是最大解毒器官，24小时持续工作。市面"排毒"产品无科学依据，有些反而损伤肝脏。',s:'中华医学会肝病学分会'},
+    {m:'"少量饮酒对肝脏没伤害，红酒能护肝"',q:'关于饮酒和肝脏，哪个正确？',o:['任何剂量酒精都会对肝脏造成负担，没有安全饮酒量','红酒白藜芦醇可以护肝','只有酗酒才伤肝','肝脏能100%分解酒精'],c:0,e:'2018年《柳叶刀》大规模研究：最安全饮酒量是零。酒精代谢产物乙醛是一级致癌物。',s:'《柳叶刀》(2018)'},
+    {m:'"转氨酶升高一定是肝炎"',q:'关于转氨酶升高，哪个正确？',o:['剧烈运动、熬夜、药物等都可能导致转氨酶一过性升高','转氨酶升高一定是肝炎','转氨酶正常就代表肝脏完全健康','转氨酶升高不需要复查'],c:0,e:'转氨酶升高原因很多：运动、熬夜、饮酒、药物、脂肪肝等。需结合病史综合判断。',s:'《内科学》第9版'},
+    {m:'"乙肝会通过日常接触传播"',q:'关于乙肝传播，哪个正确？',o:['乙肝主要通过血液、母婴和性接触传播，日常接触不会传染','乙肝会通过握手传播','和乙肝患者吃饭一定会被传染','蚊虫叮咬传播乙肝'],c:0,e:'乙肝传播途径：血液、母婴、性接触。共餐、握手、拥抱等日常接触不会传播。接种疫苗是最有效预防。',s:'WHO / 中国乙肝防治指南'},
+    {m:'"肝脏切除后不能再生"',q:'关于肝脏再生，哪个正确？',o:['肝脏是人体唯一能再生的器官，切除75%仍可恢复原大小','肝脏切除后永远无法恢复','肝脏完全没有再生能力','只有年轻人的肝脏能再生'],c:0,e:'肝脏再生能力极强。切除70-75%后，剩余肝组织可在数周至数月内再生到接近原来大小。',s:'《外科学》/ 肝脏外科'},
+    {m:'"脂肪肝是胖人才会得的病"',q:'关于脂肪肝，哪个正确？',o:['瘦人也可能得脂肪肝，与代谢、饮食结构、饮酒等因素有关','只有胖人才会得脂肪肝','脂肪肝不需要治疗','脂肪肝一定会发展成肝硬化'],c:0,e:'瘦人脂肪肝(lean NAFLD)占脂肪肝患者约20%，与胰岛素抵抗、果糖摄入过多等因素有关。',s:'《肝脏病学》'},
+    {m:'"熬夜伤肝"',q:'关于熬夜和肝脏，哪个正确？',o:['长期睡眠不足影响代谢和免疫功能，间接加重肝脏负担','熬夜对肝脏完全没有影响','熬夜直接导致肝癌','补觉可以完全消除熬夜伤害'],c:0,e:'虽无"熬夜直接伤肝"的证据，但长期睡眠不足导致代谢紊乱、氧化应激增加，间接影响肝脏健康。',s:'《肝脏病学》/ 睡眠研究'},
+    {m:'"中药天然无毒不伤肝"',q:'关于中药和肝脏，哪个正确？',o:['许多中草药有明确肝毒性，如雷公藤、何首乌等','中药完全不会伤肝','只有西药才伤肝','天然等于安全'],c:0,e:'药物性肝损伤(DILI)中，中草药占比约20-30%。雷公藤、何首乌、土三七等有明确肝毒性。',s:'中华医学会肝病学分会 DILI指南'},
+    {m:'"肝功能检查正常就说明肝脏没问题"',q:'关于肝功能检查，哪个正确？',o:['肝功能检查正常不代表完全没有肝病，需结合影像学等综合判断','肝功正常就代表肝脏完全健康','肝功能检查能查出所有肝病','不需要定期检查肝功能'],c:0,e:'肝脏代偿能力强大，早期肝病可能肝功正常。需结合超声、CT、FibroScan等综合评估。',s:'《诊断学》'},
+    {m:'"吃猪肝能补肝"',q:'"以形补形"有道理吗？',o:['"以形补形"没有科学依据，猪肝胆固醇和嘌呤含量很高','吃猪肝确实能补肝','吃核桃补脑是因为长得像大脑','以形补形是中医核心理论'],c:0,e:'"以形补形"不是正规中医理论。猪肝虽含铁和维A，但胆固醇和嘌呤很高，过量食用反而有害。',s:'《营养学》/ 中国居民膳食指南'}
+  ],
+  life_daily:[
+    {m:'"失眠就是睡不着"',q:'关于失眠症，哪个正确？',o:['失眠包括入睡困难、维持睡眠困难和早醒三种类型','失眠只有睡不着一种表现','失眠不是疾病','偶尔一晚没睡好就是失眠症'],c:0,e:'失眠症诊断标准：入睡时间>30min、夜间觉醒≥2次、早醒且无法再入睡，每周≥3次，持续≥3个月。',s:'《精神医学》/ ICSD-3'},
+    {m:'"打鼾是睡得香的表现"',q:'关于阻塞性睡眠呼吸暂停(OSA)，哪个正确？',o:['严重打鼾伴呼吸暂停是OSA典型症状，可导致间歇性缺氧','打鼾就是睡得好','只有胖人才打鼾','打鼾不需要治疗'],c:0,e:'OSA患者睡眠中反复出现上气道塌陷，导致缺氧和睡眠片段化。长期增加高血压、心律失常和猝死风险。',s:'《睡眠医学》/ AASM'},
+    {m:'"梦游时不能叫醒患者"',q:'关于梦游症，哪个正确？',o:['梦游时应温和引导回床上，强行叫醒虽不危险但可能导致短暂困惑','叫醒梦游者会导致精神失常','梦游只是演戏','成年人不会梦游'],c:0,e:'叫醒梦游者不会造成伤害，但患者可能短暂困惑。正确做法：轻柔引导回床。频繁发作需就医排除癫痫。',s:'《神经病学》/ AASM'},
+    {m:'"老年痴呆是正常衰老"',q:'关于阿尔茨海默病，哪个正确？',o:['阿尔茨海默病是神经退行性疾病，不是正常衰老，需早期干预','老年痴呆是正常老化','记忆力下降就是痴呆','阿尔茨海默病无法诊断'],c:0,e:'AD是病理性脑萎缩，β-淀粉样蛋白沉积和tau蛋白缠结为特征。MCI阶段干预可延缓进展。',s:'《神经病学》/ NIA-AA诊断标准'},
+    {m:'"抑郁症只是心情不好"',q:'关于抑郁症，哪个正确？',o:['抑郁症是大脑神经递质失衡导致的疾病，需要专业治疗','抑郁症就是想不开','只有性格软弱的人才会抑郁','抑郁症不需要吃药'],c:0,e:'抑郁症涉及5-HT、NE、DA等神经递质异常。表现为持续2周以上的情绪低落、兴趣丧失、精力减退。',s:'《精神医学》/ DSM-5'},
+    {m:'"癫痫患者不能上学工作"',q:'关于癫痫，哪个正确？',o:['多数癫痫患者经规范治疗可控制发作，正常学习和工作','癫痫患者不能上学','癫痫会传染','癫痫只能用手术治疗'],c:0,e:'约70%癫痫患者可通过药物控制发作。歧视比疾病本身更影响患者生活质量。',s:'《神经病学》/ ILAE'},
+    {m:'"焦虑症不是真正的病"',q:'关于焦虑障碍，哪个正确？',o:['焦虑障碍是常见的精神疾病，涉及杏仁核等脑区功能异常','焦虑是性格问题不是病','所有人都有焦虑不需要治疗','焦虑症可以靠意志力克服'],c:0,e:'焦虑障碍全球患病率约3.6%。涉及GABA、5-HT等神经递质失衡和杏仁核过度激活。',s:'《精神医学》/ DSM-5 / WHO'},
+    {m:'"帕金森病只是手抖"',q:'关于帕金森病，哪个正确？',o:['帕金森病除震颤外还有肌强直、运动迟缓和姿势不稳等核心症状','帕金森病只有手抖一个症状','手抖就是帕金森','帕金森只影响运动不影响认知'],c:0,e:'PD四大核心症状：静止性震颤、肌强直、运动迟缓、姿势步态异常。晚期可出现痴呆。',s:'《神经病学》/ MDS诊断标准'},
+    {m:'"偏头痛不是大病忍忍就好"',q:'关于偏头痛，哪个正确？',o:['偏头痛是神经血管性疾病，频繁发作需预防性治疗','偏头痛不严重','偏头痛就是普通头痛','止痛药可以长期随意吃'],c:0,e:'偏头痛涉及三叉神经血管系统激活和CGRP释放。每月发作≥4次建议预防用药。',s:'《神经病学》/ ICHD-3'},
+    {m:'"脑卒中(中风)无法预防"',q:'关于脑卒中预防，哪个正确？',o:['控制高血压、糖尿病、戒烟限酒等可显著降低卒中风险','脑卒中完全不可预防','只有老年人才会中风','中风前没有预警信号'],c:0,e:'约90%卒中与可控危险因素相关。高血压是首要危险因素，控制血压可降低约40%卒中风险。',s:'《神经病学》/ AHA/ASA指南'}
+  ],
+  life_food:[
+    {m:'"糖尿病是吃糖吃出来的"',q:'关于2型糖尿病，哪个正确？',o:['2型糖尿病与胰岛素抵抗和β细胞功能衰退有关，不仅仅是吃糖多','吃糖多一定得糖尿病','糖尿病患者不能吃任何糖','糖尿病可以根治'],c:0,e:'2型糖尿病发病涉及遗传、肥胖、久坐等多因素。单纯吃糖多不直接导致糖尿病，但高糖饮食增加肥胖风险。',s:'《内科学》/ ADA'},
+    {m:'"肥胖只是胖一点不算是病"',q:'关于肥胖症，哪个正确？',o:['肥胖症是WHO认定的慢性疾病，与200+种并发症相关','胖只是外观问题','只有BMI高才算胖','减肥只需要少吃多动'],c:0,e:'肥胖症增加2型糖尿病、心血管病、多种癌症、关节退变等风险。BMI≥28(中国标准)即为肥胖。',s:'WHO / 《中国肥胖防治指南》'},
+    {m:'"贫血就是缺铁"',q:'关于贫血，哪个正确？',o:['贫血有多种类型，包括缺铁性、巨幼细胞性、再生障碍性等','贫血一定是缺铁','吃红枣能治贫血','贫血不严重不用治'],c:0,e:'贫血原因多样：缺铁、缺B12/叶酸、慢性病、溶血、骨髓疾病等。需查血常规+铁代谢+维生素B12等明确分型。',s:'《血液病学》'},
+    {m:'"痛风患者不能吃任何肉"',q:'关于痛风饮食，哪个正确？',o:['痛风患者可适量食用低嘌呤肉类(如鸡胸肉)，关键是控制总量和避免高嘌呤食物','痛风不能吃任何肉','痛风只和饮食有关','痛风发作时要热敷'],c:0,e:'痛风管理需综合：限酒(尤其啤酒)、限高嘌呤食物(内脏、海鲜)、多饮水、规范降尿酸治疗。',s:'《内科学》/ 中华风湿病学分会'},
+    {m:'"高血脂是吃油多引起的"',q:'关于高脂血症，哪个正确？',o:['高血脂与饮食、遗传、代谢等多因素相关，内源性胆固醇占80%','高血脂完全因为吃油多','瘦人不会得高血脂','血脂高没有症状不需要治疗'],c:0,e:'人体约80%胆固醇由肝脏合成(内源性)，仅20%来自饮食。家族性高胆固醇血症与饮食关系更小。',s:'《内科学》/ ACC/AHA血脂指南'},
+    {m:'"维生素C能预防感冒"',q:'关于维C和感冒，哪个正确？',o:['大量研究显示维C不能预防感冒，仅可能轻微缩短病程','大量维C能完全预防感冒','感冒了吃大量维C能治愈','维C没有任何保健作用'],c:0,e:'Cochrane荟萃分析(含29项试验/11306人)：常规补充维C不能降低感冒发生率。',s:'Cochrane Review (2013)'},
+    {m:'"骨质疏松只需要补钙就行"',q:'关于骨质疏松症，哪个正确？',o:['骨质疏松需综合治疗：钙+维D+抗骨松药物+运动，单纯补钙不够','只补钙就能治骨质疏松','骨质疏松只有老年女性才得','骨质疏松不需要治疗'],c:0,e:'骨质疏松治疗需：钙(1000-1200mg/d)+维D(800IU/d)+双膦酸盐等药物+负重运动+防跌倒。',s:'《内科学》/ NOF指南'},
+    {m:'"甲亢就是大脖子病"',q:'关于甲状腺疾病，哪个正确？',o:['甲亢是甲状腺激素分泌过多，大脖子病(地方性甲状腺肿)主要因缺碘','甲亢和大脖子病是同一种病','甲亢患者一定脖子粗','甲状腺疾病都很严重'],c:0,e:'甲亢(Graves病)是自身免疫病，表现为心悸、消瘦、手抖。地方性甲状腺肿因碘缺乏，两者病因不同。',s:'《内科学》/ ATA'},
+    {m:'"肾结石患者不能吃任何含钙食物"',q:'关于肾结石饮食，哪个正确？',o:['适量钙摄入反而有助减少草酸钙结石，关键是多喝水和限制钠盐','肾结石不能吃任何钙','多喝啤酒能排石','肾结石只有男性才得'],c:0,e:'低钙饮食反而增加肠道草酸吸收。推荐正常钙摄入(1000-1200mg/d)+多饮水(>2L/d)+限钠。',s:'《泌尿外科学》/ AUA指南'},
+    {m:'"脂肪肝不需要治疗会自愈"',q:'关于非酒精性脂肪肝(NAFLD)，哪个正确？',o:['NAFLD可能进展为肝纤维化和肝硬化，需要生活方式干预和定期随访','脂肪肝一定会自愈','只有胖人才得脂肪肝','脂肪肝不影响肝功能'],c:0,e:'NAFLD约20-30%可进展为NASH(脂肪性肝炎)，其中约20%在10-20年内发展为肝纤维化。',s:'《肝脏病学》/ EASL'}
+  ],
+  life_skin:[
+    {m:'"银屑病(牛皮癣)会传染"',q:'关于银屑病，哪个正确？',o:['银屑病是自身免疫性疾病，不传染，与遗传和免疫异常有关','银屑病会通过接触传染','银屑病能根治','银屑病只影响皮肤'],c:0,e:'银屑病是T细胞介导的自身免疫病，累及皮肤和关节。不传染但有遗传倾向(30%患者有家族史)。',s:'《皮肤性病学》/ AAD'},
+    {m:'"白癜风是血液病"',q:'关于白癜风，哪个正确？',o:['白癜风是皮肤黑素细胞被免疫系统破坏导致的色素脱失，不是血液病','白癜风是血液有问题','白癜风会传染','白癜风无法治疗'],c:0,e:'白癜风是自身免疫病，CD8+T细胞攻击黑素细胞。约20%患者有家族史。可治疗但难根治。',s:'《皮肤性病学》/ AAD'},
+    {m:'"荨麻疹是过敏引起的，查过敏原就行"',q:'关于荨麻疹，哪个正确？',o:['慢性荨麻疹约80%为自发性，找不到明确过敏原，与免疫紊乱有关','荨麻疹一定是过敏','找到过敏原就能根治荨麻疹','荨麻疹只在皮肤不会影响内脏'],c:0,e:'慢性荨麻疹(>6周)中仅约20%能找到明确诱因。主要机制是肥大细胞脱颗粒释放组胺。',s:'《皮肤性病学》/ EAACI指南'},
+    {m:'"带状疱疹只会长一次"',q:'关于带状疱疹，哪个正确？',o:['带状疱疹可复发，尤其在免疫力低下人群中复发率更高','得过一次就不会再得','年轻人不会得带状疱疹','带状疱疹和水痘无关'],c:0,e:'水痘-带状疱疹病毒(VZV)潜伏在神经节，免疫力下降时可再次激活。免疫缺陷者复发率可达10-20%。',s:'《皮肤性病学》/ CDC'},
+    {m:'"湿疹是因为皮肤太湿"',q:'关于特应性皮炎(湿疹)，哪个正确？',o:['湿疹是皮肤屏障功能缺陷+免疫异常导致的慢性炎症，皮肤实际上是干燥的','湿疹是因为湿气重','湿疹只在潮湿季节发作','湿疹可以根治'],c:0,e:'AD患者丝聚蛋白(filaggrin)基因突变导致皮肤屏障缺陷，经皮水分丢失增加，免疫失衡引发炎症。',s:'《皮肤性病学》/ AAAAI'},
+    {m:'"皮肤癌只有白人才会得"',q:'关于皮肤癌，哪个正确？',o:['虽然白人发病率更高，但亚洲人也可能患皮肤癌，尤其肢端型黑色素瘤','皮肤癌只在白人中发生','所有黑痣都会癌变','防晒和皮肤癌无关'],c:0,e:'亚洲人黑色素瘤好发于肢端(足底、手掌)，与紫外线关系较小。早期发现5年生存率可达99%。',s:'《皮肤性病学》/ AJCC'},
+    {m:'"脱发(雄激素性秃发)是肾虚"',q:'关于雄激素性秃发(AGA)，哪个正确？',o:['AGA与遗传和雄激素(DHT)有关，不是肾虚，可用米诺地尔和非那雄胺治疗','脱发是因为肾虚','洗发水能治脱发','脱发只影响男性'],c:0,e:'AGA中DHT使毛囊微小化。男性用非那雄胺+米诺地尔，女性用米诺地尔。植发是最终方案。',s:'《皮肤性病学》/ AAD'},
+    {m:'"皮肤过敏就是敏感肌"',q:'关于接触性皮炎，哪个正确？',o:['接触性皮炎分为刺激性和过敏性两类，需斑贴试验明确致敏原','皮肤过敏就是敏感肌','只有化妆品会导致过敏','过敏性皮炎几天就能自愈'],c:0,e:'过敏性接触性皮炎是IV型超敏反应(迟发型)，常见致敏原包括镍、香料、防腐剂等。',s:'《皮肤性病学》/ AAD'},
+    {m:'"疤痕疙瘩可以用药膏消除"',q:'关于瘢痕疙瘩，哪个正确？',o:['瘢痕疙瘩需综合治疗：糖皮质激素注射、硅胶贴、激光等，药膏效果有限','药膏能完全消除瘢痕疙瘩','瘢痕疙瘩会自愈','瘢痕疙瘩和普通疤痕一样'],c:0,e:'瘢痕疙瘩是成纤维细胞过度增殖，超出原伤口边界。首选曲安奈德注射，辅以硅胶贴和压力治疗。',s:'《皮肤科学》'},
+    {m:'"真菌感染(脚气)不治也能好"',q:'关于足癣(脚气)，哪个正确？',o:['足癣由皮肤癣菌感染引起，不治疗可反复发作并传染到其他部位','脚气不治也能自愈','脚气只是小问题','用醋泡脚能根治脚气'],c:0,e:'足癣需规范抗真菌治疗(外用特比萘芬/酮康唑≥2-4周)。不治疗可继发细菌感染或传染至手、甲。',s:'《皮肤性病学》/ IDSA'}
+  ],
+  life_exercise:[
+    {m:'"半月板损伤一定要手术"',q:'关于半月板损伤，哪个正确？',o:['部分半月板损伤可保守治疗(制动+康复)，只有严重撕裂才需手术','所有半月板损伤都要手术','半月板损伤不用管自然会好','半月板可以完全再生'],c:0,e:'半月板红区(血供丰富)撕裂有自愈可能。白区撕裂和交锁症状多需关节镜手术。',s:'《骨科学》/ AAOS'},
+    {m:'"腰椎间盘突出必须卧床"',q:'关于腰椎间盘突出症，哪个正确？',o:['大多数腰突症可保守治疗(适当活动+理疗)，仅严重者需手术','必须绝对卧床','腰突一定需要手术','推拿可以推回去'],c:0,e:'约80-90%腰突症可保守治疗缓解。急性期适当卧床(不超过2天)后应逐步恢复活动。',s:'《骨科学》/ NASS'},
+    {m:'"骨折后补钙越多越好"',q:'关于骨折后补钙，哪个正确？',o:['过度补钙可能导致便秘和肾结石，每日1000-1200mg即可','补钙越多骨折愈合越快','骨折后不需要补钙','骨头汤是最佳补钙来源'],c:0,e:'骨折愈合需适量钙+维D+蛋白质。过量补钙无额外益处，反而增加肾结石和心血管风险。',s:'《骨科学》/ 《营养学》'},
+    {m:'"肩周炎(冻结肩)要使劲活动"',q:'关于冻结肩，哪个正确？',o:['冻结肩需循序渐进的功能锻炼，暴力推拿可能加重粘连和炎症','使劲甩胳膊能治冻结肩','冻结肩不用治疗自然会好','只有老年人才得冻结肩'],c:0,e:'冻结肩(粘连性关节囊炎)分三期：冻结期→冻结期→解冻期。功能锻炼应循序渐进。',s:'《骨科学》/ AAOS'},
+    {m:'"韧带断裂接上就和原来一样"',q:'关于前交叉韧带(ACL)损伤，哪个正确？',o:['ACL重建术后需6-12个月系统康复，运动员约65-90%能恢复伤前水平','手术后立刻就能运动','韧带可以自然愈合','ACL损伤只在运动员中发生'],c:0,e:'ACL重建用自体/异体肌腱替代。术后康复至关重要，约35%运动员无法完全恢复竞技水平。',s:'《运动医学》/ AOSSM'},
+    {m:'"运动后肌肉酸痛说明拉伤了"',q:'关于延迟性肌肉酸痛(DOMS)，哪个正确？',o:['DOMS是微肌纤维损伤和炎症反应，通常24-72小时自行缓解，不是拉伤','肌肉酸痛就是拉伤','DOMS说明运动过度','拉伸能完全预防DOMS'],c:0,e:'DOMS由离心收缩导致肌纤维微损伤引起。是正常适应过程，冰敷和轻度活动可缓解。',s:'《运动医学》/ ACSM'},
+    {m:'"骨质疏松是老年妇女的病"',q:'关于骨质疏松症，哪个正确？',o:['男性也会骨质疏松(约占患者20%)，50岁后骨折风险显著增加','只有老年女性才骨质疏松','骨质疏松没有症状就不需要治疗','骨密度检查不重要'],c:0,e:'男性骨质疏松常被忽视。50岁以上男性约25%会发生骨质疏松性骨折。',s:'《骨科学》/ NOF'},
+    {m:'"扭伤后贴膏药就能好"',q:'关于踝关节扭伤，哪个正确？',o:['急性扭伤应RICE处理(休息、冰敷、加压、抬高)，严重韧带撕裂需固定或手术','贴膏药就能治好扭伤','扭伤后应该热敷按摩','踝关节扭伤不需要康复训练'],c:0,e:'踝关节扭伤后约40%发展为慢性踝关节不稳。规范康复训练可降低复发率。',s:'《运动医学》/ AAOS'},
+    {m:'"脊柱侧弯是坐姿不好引起的"',q:'关于青少年特发性脊柱侧弯(AIS)，哪个正确？',o:['AIS病因不明，与遗传和生长发育有关，不良坐姿不是主因','脊柱侧弯完全因为坐姿不好','轻度侧弯不需要随访','脊柱侧弯只能手术矫正'],c:0,e:'AIS约占脊柱侧弯的80%，病因涉及遗传因素。Cobb角<25°观察+运动，25-45°支具，>45°考虑手术。',s:'《骨科学》/ SRS'},
+    {m:'"颈椎病就是脖子疼"',q:'关于颈椎病，哪个正确？',o:['颈椎病分神经根型、脊髓型、交感型等，脊髓型可致瘫痪，不只是疼痛','颈椎病只是脖子疼','颈椎病不需要治疗','低头看手机和颈椎病无关'],c:0,e:'脊髓型颈椎病最严重，可导致四肢瘫痪。早期表现为手指精细动作障碍、走路踩棉花感。',s:'《骨科学》'}
+  ],
+  life_season:[
+    {m:'"流感就是重感冒"',q:'关于流行性感冒，哪个正确？',o:['流感是流感病毒引起的急性传染病，比普通感冒严重得多，可致死','流感就是普通感冒加重','流感不需要抗病毒治疗','抗生素能治流感'],c:0,e:'流感可导致肺炎、心肌炎、脑炎等严重并发症。高危人群应在发病48h内使用奥司他韦。',s:'《传染病学》/ CDC'},
+    {m:'"春季花粉过敏不用管"',q:'关于过敏性鼻炎，哪个正确？',o:['花粉症可进展为哮喘(约40%)，需规范抗过敏治疗和过敏原回避','花粉过敏不用治疗','花粉过敏只在春天发作','过敏性鼻炎和哮喘无关'],c:0,e:'过敏性鼻炎和哮喘是"同一气道，同一疾病"。约40%鼻炎患者合并哮喘。',s:'ARIA指南 / 《耳鼻咽喉科学》'},
+    {m:'"夏天拉肚子就是吃坏东西"',q:'关于感染性腹泻，哪个正确？',o:['夏季腹泻可能是细菌(沙门氏菌、致病性大肠杆菌)或病毒感染，需鉴别治疗','拉肚子一定是吃坏东西','腹泻都要吃抗生素','腹泻时不能吃任何东西'],c:0,e:'感染性腹泻分细菌性和病毒性。细菌性可能需要抗生素，病毒性以补液为主。盲目用止泻药不利排毒素。',s:'《传染病学》/ 《消化病学》'},
+    {m:'"冬天血压高是正常的"',q:'关于冬季血压管理，哪个正确？',o:['冬季寒冷导致血管收缩血压升高，高血压患者需监测并可能调整用药剂量','冬天血压高不用管','冬季可以减少降压药','冬天血压波动不影响健康'],c:0,e:'冬季收缩压平均比夏季高5-10mmHg。老年高血压患者冬季卒中和心梗风险显著增加。',s:'《高血压杂志》/ ESC'},
+    {m:'"秋冬季腹泻轮状病毒只感染儿童"',q:'关于轮状病毒，哪个正确？',o:['轮状病毒可感染所有年龄段，成人症状通常较轻但仍有传染性','轮状病毒只感染婴幼儿','轮状病毒只在冬天传播','抗生素能治疗轮状病毒'],c:0,e:'轮状病毒是全球婴幼儿严重腹泻首要原因。成人感染症状轻但可传播给儿童。疫苗是有效预防手段。',s:'《传染病学》/ WHO'},
+    {m:'"手足口病只有小孩才会得"',q:'关于手足口病，哪个正确？',o:['成人也可感染手足口病，通常症状较轻但仍有传染性','只有5岁以下儿童才会得','手足口病症状很轻不需要就医','手足口病没有并发症'],c:0,e:'手足口病多发于5岁以下，但成人也可感染。少数患儿可出现脑干脑炎、神经源性肺水肿等重症。',s:'《传染病学》/ CDC'},
+    {m:'"空调房容易得空调病是伪概念"',q:'关于军团菌肺炎，哪个正确？',o:['空调系统若未清洁可滋生军团菌，导致重症肺炎，病死率可达10-15%','军团菌肺炎不存在','空调病只是着凉','只有老年人才会感染军团菌'],c:0,e:'军团菌在25-45°C水温中繁殖。中央空调冷却塔是主要污染源。空调房需定期清洁消毒。',s:'《传染病学》/ CDC'},
+    {m:'"春天容易犯困是"春困"不用管"',q:'关于季节性情绪障碍(SAD)，哪个正确？',o:['SAD是与季节变化相关的情绪障碍，严重时需光疗或药物治疗','春困只是懒','季节变化不会影响情绪','SAD只在冬天发生'],c:0,e:'SAD与光照变化影响褪黑素和5-HT分泌有关。冬季型更常见，但春季型也存在。',s:'《精神医学》/ DSM-5'},
+    {m:'"登革热只在热带地区流行"',q:'关于登革热，哪个正确？',o:['随着气候变暖，登革热传播范围已扩展至亚热带甚至温带地区','登革热只在赤道附近','登革热不会致命','防蚊和登革热预防无关'],c:0,e:'登革热由伊蚊传播，全球约一半人口面临风险。二次感染不同血清型可发展为重症登革热。',s:'《传染病学》/ WHO'},
+    {m:'"冬季冻伤后用雪搓能恢复"',q:'关于冻伤急救，哪个正确？',o:['冻伤后应缓慢复温(37-39°C温水浸泡)，用雪搓会加重组织损伤','用雪搓冻伤部位是对的','冻伤后要用热水快速复温','冻伤只是小伤不用就医'],c:0,e:'雪搓导致摩擦损伤和进一步降温。快速高温复温(如热水)可导致烫伤。正确：37-39°C温水浸泡15-30分钟。',s:'《急诊医学》/ Wilderness Medicine'}
+  ],
+  fa_cpr:[
+    {m:'"心脏骤停后按压胸口就能救活"',q:'关于心肺复苏(CPR)，哪个正确？',o:['CPR需配合AED除颤和急救呼叫，单纯按压只是急救链的一环','只按胸口就能救活','心脏骤停后等救护车就行','CPR只在医院才有效'],c:0,e:'急救链：识别→呼叫120→CPR→AED除颤→高级生命支持。单独按压生存率有限。',s:'AHA心肺复苏指南 2025'},
+    {m:'"人工呼吸是CPR最重要的部分"',q:'关于CPR步骤，哪个正确？',o:['对普通施救者，高质量胸外按压比人工呼吸更重要','人工呼吸是CPR最重要的步骤','不做人工呼吸CPR就无效','按压30次再呼吸2次才有效'],c:0,e:'2020 AHA指南强调：未经培训的施救者可只做单纯胸外按压(Hands-Only CPR)。',s:'AHA Guidelines 2020'},
+    {m:'"发现有人倒地应该先摇晃他看有没有意识"',q:'关于急救第一步，哪个正确？',o:['应轻拍双肩、大声呼唤判断意识，不要剧烈摇晃','应该用力摇晃','直接开始按压','先打电话叫家属'],c:0,e:'正确步骤：轻拍肩膀+大声呼唤"你还好吗"。无反应立即呼叫120并开始CPR。',s:'AHA / ERC急救指南'},
+    {m:'"AED只有专业医生才能用"',q:'关于AED(自动体外除颤器)，哪个正确？',o:['AED设计为普通人可使用，有语音引导，开机后跟着做即可','只有医生能用AED','AED使用很危险','用AED前需要培训证书'],c:0,e:'AED是全自动设备，开机后会自动分析心律并语音指导。任何人都可以使用，不会误电击。',s:'AHA / 中国AED推广指南'},
+    {m:'"溺水者要先控水再做CPR"',q:'关于溺水急救，哪个正确？',o:['不要控水浪费时间！立即开始CPR，溺水者最需要的是氧气','应该倒提控水','先按肚子排水','等水控完再做CPR'],c:0,e:'控水已被国际指南明确否定。倒挂控水延误CPR时机，可能增加误吸风险。',s:'AHA / ERC溺水急救指南'},
+    {m:'"癫痫发作时要往嘴里塞东西"',q:'关于癫痫急救，哪个正确？',o:['不要往嘴里塞任何东西！应保护头部、侧卧位、等待发作结束','应该塞毛巾防止咬舌','应该按住患者身体','掐人中可以止住癫痫'],c:0,e:'往嘴里塞东西可能导致窒息或牙齿损伤。正确做法：移开危险物品、保护头部、侧卧位。',s:'《神经病学》/ ILAE'},
+    {m:'"胸外按压会压断肋骨所以不应该按"',q:'关于按压力度，哪个正确？',o:['按压深度5-6cm是关键，即使可能压断肋骨也不能减轻力度','按压越轻越好','不会压断肋骨','宁可不按也不能压伤'],c:0,e:'高质量CPR要求按压深度5-6cm。老年人可能肋骨骨折，但生存比肋骨更重要。',s:'AHA Guidelines 2020'},
+    {m:'"被蛇咬了应该用嘴吸毒"',q:'关于蛇咬伤急救，哪个正确？',o:['不要吸毒！应保持冷静、限制活动、尽快就医','用嘴吸毒是正确方法','应该在伤口上方扎止血带','切开伤口挤出毒液'],c:0,e:'吸毒可能导致施救者中毒。正确做法：记住蛇的特征、保持伤肢低于心脏、尽快就医。',s:'《急诊医学》/ WHO'},
+    {m:'"流鼻血时应该仰头"',q:'关于鼻出血处理，哪个正确？',o:['应低头前倾、捏住鼻翼两侧10-15分钟，仰头可能导致血液流入气管','仰头是正确方法','应该用纸巾塞住鼻孔','流鼻血要马上去医院'],c:0,e:'仰头使血液流向咽喉，可能呛入气管或吞入胃部引起呕吐。正确姿势：低头前倾。',s:'《耳鼻咽喉头颈外科学》'},
+    {m:'"中暑的人应该给他喝冰水降温"',q:'关于中暑降温，哪个正确？',o:['应转移至阴凉处、物理降温(湿毛巾擦拭)、补充淡盐水','应该喝大量冰水','应该用冰块直接敷全身','中暑不需要降温自己会好'],c:0,e:'大量冰水可能引起胃痉挛。正确方法：阴凉处、解开衣物、湿毛巾擦拭、少量多次补充淡盐水。',s:'《急诊医学》/ WHO'}
+  ],
+  fa_burn:[
+    {m:'"烫伤了要涂牙膏"',q:'关于烫伤处理，哪个正确？',o:['应该用流动冷水冲洗15-20分钟，不要涂任何偏方','涂牙膏能治烫伤','涂酱油能缓解烫伤','涂蜂蜜能治烧伤'],c:0,e:'牙膏、酱油等会阻碍散热、增加感染风险。正确处理：冷水冲15-20分钟→覆盖→就医。',s:'《烧伤外科学》/ WHO'},
+    {m:'"烧伤后要挑破水泡"',q:'关于烧伤水泡，哪个正确？',o:['不要自行挑破水泡！水泡皮是天然保护层，挑破增加感染风险','水泡一定要挑破','小水泡不用管大水泡要挑','用针挑破水泡更快愈合'],c:0,e:'水泡皮是最好的生物敷料。自行挑破增加感染风险。大面积水泡应由医生处理。',s:'《烧伤外科学》'},
+    {m:'"烧伤面积用巴掌估算"',q:'关于烧伤面积评估，哪个正确？',o:['成人一个手掌(含手指)约占体表面积1%，是快速估算方法','一个巴掌等于5%体表面积','目测就够了不需要方法','只有医生才能估算面积'],c:0,e:'手掌法：患者五指并拢的手掌面积≈1%体表面积。是现场快速评估的简便方法。',s:'《烧伤外科学》/ 九分法'},
+    {m:'"轻度烧伤不需要处理"',q:'关于轻度烧伤，哪个正确？',o:['轻度烧伤也需正确处理(冷水冲洗+保护)，防止感染和加重','轻度烧伤不用管','只有三度烧伤才需要处理','烧伤面积小就不用看医生'],c:0,e:'即使一度烧伤(红肿)也应冷水冲洗降温止痛。二度以上(水泡)需覆盖保护后就医。',s:'《烧伤外科学》'},
+    {m:'"化学烧伤不需要用水冲"',q:'关于化学烧伤，哪个正确？',o:['大多数化学烧伤需要大量清水持续冲洗，但特定化学品(如生石灰)例外','化学烧伤不能用水冲','化学烧伤涂药膏就行','化学烧伤不需要就医'],c:0,e:'大多数化学烧伤需大量清水冲15-20分钟。例外：生石灰(遇水放热)、金属钠等需先擦除再冲。',s:'《急诊化学伤害处理》'},
+    {m:'"被油烫伤和被水烫伤处理不同"',q:'关于不同类型烫伤，哪个正确？',o:['无论油烫还是水烫，急救方法相同：流动冷水冲洗15-20分钟','油烫伤更严重不需要处理','水烫伤不严重不用管','油烫伤要用醋冲洗'],c:0,e:'热液(油/水)烫伤处理原则相同。严重程度取决于温度和接触时间，不是液体种类。',s:'《烧伤外科学》'},
+    {m:'"烧伤后结痂说明在好转"',q:'关于烧伤创面判断，哪个正确？',o:['创面干燥不一定是好事，需要观察创面颜色、深度和感染征象','结痂就说明在好','发白说明在愈合','烧伤后一定会结痂'],c:0,e:'烧伤创面需评估深度(浅II度/深II度/III度)。创面发白、无痛觉可能提示深度烧伤，需及时就医。',s:'《烧伤外科学》'},
+    {m:'"电烧伤只伤皮肤不严重"',q:'关于电烧伤，哪个正确？',o:['电烧伤表面小但内部损伤可能很严重，必须就医','电烧伤不严重','电烧伤和普通烧伤一样','低压电不会造成烧伤'],c:0,e:'电烧伤入口可能很小，但电流沿血管和神经传导可导致深层组织坏死、心律失常等。',s:'《急诊医学》/ 《烧伤外科学》'},
+    {m:'"烫伤后用冰块直接敷"',q:'关于烫伤冷敷，哪个正确？',o:'应使用流动冷水(15-25°C)冲洗，冰块直接敷可导致冻伤',
+    o:['用流动冷水冲洗，冰块直接敷可导致冻伤','冰块直接敷最好','冰水效果最好','不需要冷敷直接包扎'],c:0,e:'冰块温度过低可导致冻伤加重损伤。推荐流动冷水(15-25°C)冲洗15-20分钟。',s:'《烧伤急救指南》'},
+    {m:'"烧伤疤痕可以通过运动消除"',q:'关于烧伤疤痕，哪个正确？',o:['运动不能消除疤痕，但康复锻炼可防止关节挛缩','运动能消除所有疤痕','烧伤不会留疤','只有手术才能处理疤痕'],c:0,e:'烧伤康复需要综合治疗：压力衣、硅胶贴、功能锻炼、激光、手术等。运动主要预防挛缩。',s:'《烧伤康复学》'}
+  ],
+  fa_trauma:[
+    {m:'"流血了应该马上用止血带"',q:'关于止血，哪个正确？',o:['先用直接压迫止血，大量出血才考虑止血带','所有出血都要用止血带','止血带可以一直绑着不用松','止血带绑得越紧越好'],c:0,e:'直接压迫是首选止血方法。止血带用于危及生命的四肢大出血，需记录时间定时松开。',s:'《创伤急救》/ ATLS'},
+    {m:'"伤口流血要涂红药水紫药水"',q:'关于伤口消毒，哪个正确？',o:['红药水紫药水已不推荐使用，应用碘伏消毒','红药水是最常用的消毒药','紫药水能促进愈合','酒精直接涂伤口最好'],c:0,e:'红药水含汞、紫药水有潜在致癌性，均已淘汰。推荐碘伏消毒。',s:'《外科学》/ 药品监管部门'},
+    {m:'"异物刺入身体应该立即拔出"',q:'关于异物刺入，哪个正确？',o:['不要拔出异物！异物可能堵住血管减少出血，应固定后就医','应该立即拔出','拔出来才能止血','小异物可以自己拔'],c:0,e:'异物拔出可能导致大出血和二次损伤。应固定异物、压迫止血、尽快就医。',s:'《创伤急救》/ ATLS'},
+    {m:'"伤口要保持干燥才能愈合"',q:'关于伤口愈合环境，哪个正确？',o:['适度湿润的环境更有利伤口愈合，现代敷料就是保湿型的','伤口越干越好','伤口应该暴露在空气中','结痂就是最好的愈合'],c:0,e:'湿性愈合理论已被证实优于干性愈合。适度湿润环境可加速细胞迁移和上皮化。',s:'Nature (1962) / 《伤口护理学》'},
+    {m:'"被狗咬了用肥皂水洗洗就行"',q:'关于动物咬伤，哪个正确？',o:['应用肥皂水冲洗15分钟以上，然后必须去打狂犬疫苗','冲洗后不用打疫苗','只有疯狗才会传播狂犬病','被咬后24小时内打疫苗都来得及'],c:0,e:'狂犬病致死率近100%。被动物咬伤后：肥皂水冲洗15分钟→碘伏消毒→尽快接种狂犬疫苗。',s:'WHO狂犬病指南 / 中国CDC'},
+    {m:'"扭伤了应该热敷"',q:'关于扭伤处理，哪个正确？',o:['急性扭伤48小时内应冷敷(RICE原则)，热敷会加重肿胀','扭伤应该热敷','扭伤不用处理自然会好','扭伤后应该按摩'],c:0,e:'RICE原则：Rest(休息)、Ice(冰敷)、Compression(加压包扎)、Elevation(抬高患肢)。48小时内冷敷。',s:'《运动医学》/ AAFP'},
+    {m:'"被钉子扎了不用打破伤风"',q:'关于破伤风预防，哪个正确？',o:['深部穿刺伤(如钉子扎)是破伤风高风险，必须就医评估是否需要破伤风免疫','小伤口不需要打破伤风','只有生锈的钉子才需要','破伤风不严重'],c:0,e:'破伤风梭菌存在于土壤和铁锈中。深窄伤口缺氧环境利于其繁殖。需评估免疫接种史。',s:'《传染病学》/ CDC'},
+    {m:'"受伤出血后应该撒云南白药"',q:'关于伤口处理用药，哪个正确？',o:['开放伤口应清洁消毒后覆盖，不要在伤口上撒药粉','直接在伤口撒药最好','任何药粉都可以撒在伤口上','药粉能代替止血带'],c:0,e:'药粉撒在伤口上会形成硬壳阻碍引流，增加感染风险。正确做法：清洁→消毒→覆盖→就医。',s:'《外科学》'},
+    {m:'"脱臼了应该自己复位"',q:'关于关节脱臼，哪个正确？',o:['不要自行复位！可能损伤神经血管，应固定后就医','自己复位没问题','脱臼不需要治疗','用力拉就能复位'],c:0,e:'脱臼可能合并骨折和神经血管损伤。自行复位可能加重损伤。应固定、冷敷、尽快就医。',s:'《骨科学》'},
+    {m:'"手指断了应该把断指放在冰里"',q:'关于断指保存，哪个正确？',o:['断指应用湿纱布包裹放入塑料袋，再放入冰水混合物中，不要直接接触冰','断指直接放冰里','断指泡在酒精里','断指已经没用了不需要保存'],c:0,e:'断指保存：湿纱布包裹→密封塑料袋→放入有冰水的容器(不直接接触冰)。可保存12-24小时。',s:'《显微外科学》'}
+  ],
+  fa_poison:[
+    {m:'"中毒后应该催吐"',q:'关于中毒急救，哪个正确？',o:['不是所有中毒都适合催吐，腐蚀性物质催吐会造成二次损伤','所有中毒都要催吐','中毒后喝牛奶就行','中毒后等自然代谢'],c:0,e:'强酸强碱、石油类产品中毒禁止催吐。应拨打120/中毒热线，告知毒物种类。',s:'《急诊医学》/ 中毒急救指南'},
+    {m:'"食物中毒后吃止泻药就好"',q:'关于食物中毒，哪个正确？',o:['食物中毒应先补液防脱水，严重时需就医，不要盲目止泻','吃止泻药就能好','食物中毒不用治疗','只有海鲜才会食物中毒'],c:0,e:'腹泻是排出毒素的保护机制。盲目止泻可能延长毒素在体内时间。应以补液为主。',s:'《急诊医学》/ WHO'},
+    {m:'"酒精中毒要喝浓茶解酒"',q:'关于酒精中毒，哪个正确？',o:['浓茶不解酒反而加重心脏负担，应侧卧位防误吸并就医','浓茶能解酒','咖啡能解酒','洗热水澡能解酒'],c:0,e:'浓茶咖啡因+酒精=双重心脏负担。正确处理：侧卧位、保暖、保持气道通畅、严重者送医。',s:'《急诊医学》'},
+    {m:'"蘑菇中毒可以用银针试毒"',q:'关于毒蘑菇，哪个正确？',o:['银针试毒不可靠！毒蘑菇毒素不与银反应，只有专业鉴定才能辨别','银针能检测毒蘑菇','颜色鲜艳的蘑菇才有毒','煮熟了就不会中毒'],c:0,e:'鹅膏毒素等不与银反应。"颜色鲜艳=有毒"也不可靠。预防唯一方法：不采食野生蘑菇。',s:'《急诊医学》/ 中国CDC'},
+    {m:'"被蜂蜇了要用镊子拔刺"',q:'关于蜂蜇处理，哪个正确？',o:['蜜蜂蜇伤应用卡片刮除毒刺(不要挤压)，黄蜂蜇伤不需要拔刺','用镊子拔刺最好','蜂蜇不需要处理','用嘴吸毒液'],c:0,e:'蜜蜂毒刺用卡片刮除(挤压会挤入更多毒液)。黄蜂无毒刺残留。冷敷、观察过敏反应。',s:'《急诊医学》'},
+    {m:'"一氧化碳中毒要喝水排毒"',q:'关于CO中毒，哪个正确？',o:['应立即开窗通风、转移至新鲜空气处、严重者送高压氧治疗','喝水能排毒','CO中毒不严重','闻醋能解一氧化碳'],c:0,e:'CO与血红蛋白结合力是氧气的200倍。必须高流量氧气(最好高压氧)置换。',s:'《急诊医学》/ 《职业病学》'},
+    {m:'"农药中毒要用热水冲洗皮肤"',q:'关于农药皮肤接触，哪个正确？',o:['应脱去污染衣物、用大量清水冲洗皮肤至少15分钟','热水冲洗效果更好','不用冲洗直接送医','只有口服农药才危险'],c:0,e:'农药可经皮肤吸收。应立即脱去污染衣物、大量清水冲洗(不要热水)、送医。',s:'《急诊医学》/ 中毒急救'},
+    {m:'"药物过量后催吐就能解决"',q:'关于药物过量，哪个正确？',o:['药物过量应立即拨打120，携带药物包装就医，不要自行催吐','催吐就能解决','多喝水就能稀释药物','睡一觉就好了'],c:0,e:'某些药物(如缓释剂)催吐可能导致二次过量。应携带药物包装尽快就医。',s:'《急诊医学》/ 中毒热线'},
+    {m:'"蛇毒和蜘蛛毒处理方法一样"',q:'关于不同动物咬伤，哪个正确？',o:['不同动物咬伤处理有差异，但共同原则是保持冷静、限制活动、尽快就医','所有动物咬伤处理都一样','蛇毒和蜘蛛毒成分相同','只有热带地区才有毒蛇'],c:0,e:'蛇咬伤和蜘蛛咬伤的毒液成分不同，抗毒血清也不同。共同原则：记住特征、制动、就医。',s:'《急诊医学》/ WHO'},
+    {m:'"汞温度计碎了不用处理"',q:'关于汞泄漏，哪个正确？',o:['汞蒸气有毒！应用纸板收集汞珠、开窗通风、不要用吸尘器','汞温度计碎了不用管','用吸尘器清理最方便','汞珠可以用手捡'],c:0,e:'汞蒸气吸入可导致神经系统损害。应用硬纸板推集汞珠、密封保存、开窗通风。',s:'《职业病学》/ EPA'}
+  ],
+  fa_fracture:[
+    {m:'"骨折了应该马上尝试复位"',q:'关于骨折急救，哪个正确？',o:['不要尝试现场复位！应固定制动后就医','应该自己复位','骨折不用固定直接送医','活动一下看看能不能动就不是骨折'],c:0,e:'现场复位可能损伤神经血管。正确做法：就地取材固定(夹板/硬物)→冷敷→送医。',s:'《骨科学》/ ATLS'},
+    {m:'"骨折后要多喝骨头汤补钙"',q:'关于骨折恢复饮食，哪个正确？',o:['骨头汤钙含量极低，骨折恢复更需要蛋白质、维C和均衡营养','骨头汤是最佳骨折恢复食物','骨折后要大量补钙','骨折不能吃肉'],c:0,e:'骨折愈合需要蛋白质、维C、钙、维D等。骨头汤主要成分是脂肪，钙含量很低。',s:'《骨科学》/ 《营养学》'},
+    {m:'"伤筋动骨一百天，必须完全卧床"',q:'关于骨折恢复期，哪个正确？',o:['适当的康复锻炼有助骨折愈合和功能恢复，长期制动反而有害','必须卧床100天不能动','骨折后越早活动越好','骨折好了就能完全恢复功能'],c:0,e:'长期制动导致肌肉萎缩、关节僵硬、骨质疏松。应在医生指导下循序渐进进行康复锻炼。',s:'《骨科康复学》'},
+    {m:'"骨折固定后不需要复查"',q:'关于骨折复查，哪个正确？',o:['骨折需定期复查X光了解愈合情况，调整治疗方案','固定后就不用管了','只有疼了才需要复查','一次X光就够了'],c:0,e:'骨折愈合过程中需定期(2-4周)复查X光，观察对位、骨痂形成等情况。',s:'《骨科学》'},
+    {m:'"开放性骨折要把骨头塞回去"',q:'关于开放性骨折，哪个正确？',o:['不要把露出的骨头塞回去！应用干净布覆盖、止血、固定后立即送医','应该把骨头推回去','开放性骨折不严重','用酒精消毒骨头'],c:0,e:'回推骨头会将细菌带入深处增加感染风险。应无菌覆盖、止血、制动、紧急送医。',s:'《骨科学》/ ATLS'},
+    {m:'"打了石膏就完全不能动"',q:'关于石膏固定，哪个正确？',o:['石膏固定期间应进行未固定关节的功能锻炼和肌肉等长收缩','完全不能动','石膏越紧越好','石膏可以自己拆'],c:0,e:'固定期间做邻近关节活动和肌肉等长收缩，防止肌肉萎缩和关节僵硬。',s:'《骨科康复学》'},
+    {m:'"老年人骨折卧床不严重"',q:'关于老年人骨折，哪个正确？',o:['老年人髋部骨折被称为"人生最后一次骨折"，长期卧床并发症可致命','老年人骨折不严重','老年人骨折恢复更快','老年人不需要手术'],c:0,e:'老年髋部骨折一年内死亡率高达20-30%，主要死于卧床并发症(肺炎、血栓、褥疮)。',s:'《老年骨科学》/ Lancet'},
+    {m:'"骨折后吃接骨药能加快愈合"',q:'关于骨折用药，哪个正确？',o:['没有特效"接骨药"，骨折愈合主要靠固定、营养和适当的康复锻炼','接骨药能大幅加速愈合','骨折不需要任何药物','止痛药能帮助骨折愈合'],c:0,e:'骨折愈合是自然过程。某些情况需补钙和维D，但没有"加速愈合"的特效药。',s:'《骨科学》/ 循证医学'},
+    {m:'"脱臼和骨折是一回事"',q:'关于脱臼和骨折区别，哪个正确？',o:['脱臼是关节面失去正常对合，骨折是骨骼断裂，两者不同','脱臼就是骨折','脱臼比骨折严重','两者治疗方式相同'],c:0,e:'脱臼(dislocation)：关节面完全移位。骨折(fracture)：骨骼连续性中断。两者可合并发生。',s:'《骨科学》'},
+    {m:'"骨折后按摩患处有助恢复"',q:'关于骨折后的按摩，哪个正确？',o:['骨折急性期禁止按摩！可能加重移位和损伤','按摩有助恢复','越疼越要按','按摩能促进骨痂生长'],c:0,e:'急性期按摩可能导致骨折移位、损伤周围神经血管。恢复期康复训练需在医生指导下进行。',s:'《骨科学》/ 《康复医学》'}
+  ],
+  eye_vision:[
+    {m:'"近视是因为看手机看多了"',q:'关于近视的成因，哪个正确？',o:['近视是遗传和环境(近距离用眼+户外不足)共同作用的结果','近视完全因为看手机','只有看书才会近视','近视和基因无关'],c:0,e:'近视发病与遗传(父母近视风险增3-6倍)和环境(户外活动不足、近距离用眼)密切相关。',s:'《眼科学》/ AAO'},
+    {m:'"近视可以被治愈"',q:'关于近视治疗，哪个正确？',o:['真性近视目前无法逆转，角膜塑形镜和低浓度阿托品可控制进展','按摩能治愈近视','眼保健操能治近视','近视可以通过训练恢复'],c:0,e:'真性近视是眼轴变长，不可逆转。角膜塑形镜(OK镜)和0.01%阿托品可延缓青少年近视进展。',s:'《眼科学》/ AAO近视管理指南'},
+    {m:'"戴眼镜会让近视越来越深"',q:'关于戴眼镜，哪个正确？',o:['合适的眼镜不会加深近视，不戴反而可能因视疲劳加速进展','戴眼镜会让度数越涨越快','近视了不应该戴眼镜','眼镜度数应该配低一点'],c:0,e:'研究表明合适矫正不会加速近视。欠矫(度数配低)反而可能加速近视进展。',s:'《眼科学》/ BJO研究'},
+    {m:'"白内障要等"熟了"再手术"',q:'关于白内障手术时机，哪个正确？',o:['现代白内障手术不需等"熟"，影响生活即可手术','必须等完全看不见才能做','白内障可以用眼药水治好','只有老年人才得白内障'],c:0,e:'超声乳化技术成熟，视力低于0.5影响生活即可手术。过熟白内障反而增加手术难度和并发症。',s:'《眼科学》/ AAO指南'},
+    {m:'"青光眼就是眼压高"',q:'关于青光眼，哪个正确？',o:['青光眼是视神经病变，部分患者眼压正常(正常眼压性青光眼)','青光眼一定眼压高','青光眼不严重','青光眼只会单眼发病'],c:0,e:'青光眼诊断需综合眼压、视野、OCT视神经纤维层厚度等。约1/3青光眼患者眼压在正常范围。',s:'《眼科学》/ AAO'},
+    {m:'"眼药水可以随便滴"',q:'关于眼药水使用，哪个正确？',o:['含防腐剂的眼药水长期使用可损伤角膜，激素类眼药水可致青光眼','眼药水可以随意使用','眼药水越凉越好','所有眼药水成分相同'],c:0,e:'含苯扎氯铵等防腐剂的眼药水长期使用可致角膜上皮损伤。激素类眼药水可升高眼压。',s:'《眼科学》'},
+    {m:'"飞蚊症很危险需要治疗"',q:'关于飞蚊症(玻璃体混浊)，哪个正确？',o:['大多数飞蚊症是玻璃体液化的正常老化现象，无需治疗','飞蚊症一定要手术','飞蚊症会导致失明','年轻人不会有飞蚊症'],c:0,e:'飞蚊症由玻璃体中胶原纤维聚集投影在视网膜上导致。突然出现大量飞蚊或闪光需排查视网膜脱离。',s:'《眼科学》'},
+    {m:'"色盲(色觉异常)可以治疗"',q:'关于色觉异常，哪个正确？',o:['先天性色觉异常由X染色体遗传决定，目前无法治疗','色盲可以通过训练恢复','色盲眼镜能治愈色盲','色盲不影响生活'],c:0,e:'先天性色觉异常(红绿色盲最常见)是X连锁隐性遗传。色觉矫正眼镜只能改善色觉感知，不能治愈。',s:'《眼科学》/ 遗传学'},
+    {m:'"激光手术治近视有副作用会失明"',q:'关于近视激光手术，哪个正确？',o:['激光手术安全性高(99.5%+)，严重并发症极罕见，但可能有干眼等暂时不适','激光手术一定会失明','激光手术100%无副作用','任何近视都能做激光'],c:0,e:'LASIK/SMILE等技术成熟。术后干眼(3-6个月缓解)、夜间眩光等较常见。严重并发症(感染、圆锥角膜)极罕见。',s:'《眼科学》/ AAO'},
+    {m:'"儿童斜视长大自然会好"',q:'关于斜视，哪个正确？',o:['斜视不会自愈，延误治疗可导致弱视，最佳治疗在视觉发育关键期(6岁前)','斜视长大就会自然好','斜视只是外观问题不影响视力','斜视只有手术一种治疗方式'],c:0,e:'斜视可导致弱视(大脑抑制偏斜眼信号)和立体视丧失。关键期前治疗效果最佳。',s:'《眼科学》/ AAO'}
+  ],
+  ear_hearing:[
+    {m:'"中耳炎只是耳朵痛不用管"',q:'关于中耳炎，哪个正确？',o:['慢性中耳炎可导致听力下降甚至颅内并发症，需要规范治疗','中耳炎不严重','中耳炎只有小孩才得','中耳炎自己会好'],c:0,e:'慢性化脓性中耳炎可导致鼓膜穿孔、传导性耳聋。严重时感染可扩散至颅内(脑脓肿等)。',s:'《耳鼻咽喉科学》'},
+    {m:'"耳屎(耵聍)要经常掏"',q:'关于耵聍，哪个正确？',o:['耵聍有保护作用，大多数会自行排出，频繁掏耳可能损伤外耳道','必须每周掏耳朵','耵聍是疾病','棉签掏耳朵最安全'],c:0,e:'耵聍有抗菌、防水、防虫功能。频繁掏耳可损伤外耳道皮肤，棉签反而会把耵聍推向深处。',s:'《耳鼻咽喉科学》/ AAO-HNS'},
+    {m:'"耳鸣说明耳朵有虫子"',q:'关于耳鸣，哪个正确？',o:['耳鸣最常见的原因是内耳毛细胞损伤、噪声暴露或血管搏动，不是虫子','耳鸣是因为耳朵有虫','耳鸣不需要治疗','耳鸣只有老年人才有'],c:0,e:'耳鸣病因复杂：噪声性听力损失、梅尼埃病、听神经瘤等。持续性耳鸣需听力学评估。',s:'《耳鼻咽喉科学》'},
+    {m:'"老年人耳聋是正常衰老不用管"',q:'关于老年性聋，哪个正确？',o:['老年性聋应尽早佩戴助听器，可延缓认知衰退和社交隔离','老年耳聋不需要治疗','助听器会让听力越来越差','只有老年人才会耳聋'],c:0,e:'未矫正的老年性聋与认知下降、痴呆风险增加相关(Lancet 2020)。助听器可改善交流和生活质量。',s:'Lancet (2020) / 《耳鼻咽喉科学》'},
+    {m:'"坐飞机耳朵痛要捏鼻子鼓气"',q:'关于气压伤，哪个正确？',o:['捏鼻鼓气(Valsalva动作)可帮助打开咽鼓管平衡气压，但感冒时慎用','飞机起降时不能做任何处理','耳朵痛说明有耳膜穿孔','只有婴儿才会有气压伤'],c:0,e:'气压性中耳炎由咽鼓管功能不良导致。Valsalva动作、咀嚼口香糖可帮助平衡气压。感冒时咽鼓管肿胀应避免飞行。',s:'《耳鼻咽喉科学》'},
+    {m:'"听力下降只要大声说话就行"',q:'关于听力损失康复，哪个正确？',o:['听力损失应尽早干预(助听器或人工耳蜗)，单纯大声说话不能替代','大声说话就能解决听力问题','听力下降不需要康复训练','人工耳蜗只能用于全聋'],c:0,e:'听觉剥夺效应：长期不使用听觉通路会导致听觉皮层重塑，增加后续康复难度。',s:'《耳鼻咽喉科学》/ AAA'},
+    {m:'"耳机音量只要不超过最大就行"',q:'关于听力保护，哪个正确？',o:['建议耳机音量不超过最大音量的60%，连续使用不超过60分钟(60-60法则)','只要不超过最大音量就安全','入耳式和头戴式对听力影响相同','隔音耳塞对听力有害'],c:0,e:'WHO建议成人噪声暴露不超过85dB/8小时。长时间80dB以上可导致噪声性听力损失。',s:'WHO / CDC'},
+    {m:'"美尼尔病就是头晕"',q:'关于梅尼埃病(美尼尔)，哪个正确？',o:['梅尼埃病三联征：发作性眩晕+波动性听力下降+耳鸣，不只是头晕','梅尼埃病只有头晕症状','头晕一定是梅尼埃病','梅尼埃病可以根治'],c:0,e:'梅尼埃病由内淋巴积水导致。发作持续20分钟-数小时。低盐饮食+利尿剂可减少发作。',s:'《耳鼻咽喉科学》/ AAO-HNS'},
+    {m:'"新生儿听力筛查不重要"',q:'关于新生儿听力筛查，哪个正确？',o:['新生儿听力筛查可在出生后早期发现听力障碍，6个月内干预效果最佳','听力筛查不重要','等孩子大了再查也行','听力筛查通过就永远不会聋'],c:0,e:'1-3-6原则：1个月内筛查→3个月内确诊→6个月内干预。早期干预的语言发育结果接近正常儿童。',s:'《耳鼻咽喉科学》/ JCIH'},
+    {m:'"耳朵进水跳一跳就行"',q:'关于耳朵进水处理，哪个正确？',o:['进水后头偏向一侧轻拉耳廓让水流出即可，不要用棉签深入掏','耳朵进水必须去医院','进水后用吹风机吹干','耳朵进水会导致中耳炎'],c:0,e:'正常外耳道进水可自行蒸发或流出。有鼓膜穿孔者进水可能导致中耳炎。',s:'《耳鼻咽喉科学》'}
+  ],
+  nose_sinuses:[
+    {m:'"鼻炎不治也能好"',q:'关于过敏性鼻炎，哪个正确？',o:['过敏性鼻炎需规范治疗(鼻用激素+抗组胺药)，不治可进展为哮喘','鼻炎不用治疗','鼻炎只在春天发作','鼻炎和感冒是同一种病'],c:0,e:'过敏性鼻炎不治疗可进展为哮喘(约40%)、鼻窦炎、中耳炎等。鼻用糖皮质激素是首选治疗。',s:'ARIA指南 / 《耳鼻咽喉科学》'},
+    {m:'"鼻出血时仰头止血"',q:'关于鼻出血急救，哪个正确？',o:['应低头前倾、捏住鼻翼两侧10-15分钟，仰头可能导致血液流入气管','仰头是正确的止血方法','鼻出血要用纸巾塞住','流鼻血一定是有大病'],c:0,e:'仰头使血液流向咽喉可能呛入气管或吞入胃部引起呕吐。正确姿势：低头前倾。',s:'《耳鼻咽喉科学》'},
+    {m:'"鼻中隔偏曲一定要手术"',q:'关于鼻中隔偏曲，哪个正确？',o:['轻度偏曲无症状不需手术，只有引起严重鼻塞或头痛才考虑手术','所有鼻中隔偏曲都要手术','鼻中隔偏曲会导致脸歪','鼻中隔偏曲可以通过按摩矫正'],c:0,e:'约80%成人有不同程度鼻中隔偏曲。无症状不需处理。手术指征：顽固性鼻塞、头痛、反复鼻出血。',s:'《耳鼻咽喉科学》'},
+    {m:'"鼻窦炎吃抗生素就行"',q:'关于鼻窦炎治疗，哪个正确？',o:['急性细菌性鼻窦炎需抗生素+鼻用激素，慢性鼻窦炎可能需要手术','鼻窦炎吃几天抗生素就好','鼻窦炎不需要治疗','鼻窦炎和感冒无关'],c:0,e:'急性鼻窦炎：抗生素10-14天+鼻用激素+鼻腔冲洗。慢性鼻窦炎(>12周)可能需要功能性内镜鼻窦手术。',s:'《耳鼻咽喉科学》/ EPOS'},
+    {m:'"鼻喷剂用了就停不下来"',q:'关于鼻喷剂依赖，哪个正确？',o:['含减充血剂的鼻喷剂(如羟甲唑啉)超过7天可致药物性鼻炎，鼻用激素不会','所有鼻喷剂都会依赖','鼻喷剂对鼻腔有害','鼻用激素喷剂会上瘾'],c:0,e:'减充血剂类鼻喷剂>7天可致反跳性鼻塞(药物性鼻炎)。鼻用糖皮质激素(布地奈德等)不会导致依赖。',s:'《耳鼻咽喉科学》/ ARIA'},
+    {m:'"闻不到味道就是感冒"',q:'关于嗅觉障碍，哪个正确？',o:['嗅觉丧失可能是阿尔茨海默病或帕金森病的早期信号，也可能是后遗症','闻不到味道一定是感冒','嗅觉障碍不重要','嗅觉丧失无法恢复'],c:0,e:'嗅觉减退是神经退行性疾病的早期标志物。COVID-19后嗅觉障碍也较常见。',s:'《神经病学》/ 《耳鼻咽喉科学》'},
+    {m:'"洗鼻会损伤鼻腔"',q:'关于鼻腔冲洗，哪个正确？',o:['生理盐水鼻腔冲洗安全有效，是鼻窦炎和过敏性鼻炎的推荐辅助治疗','洗鼻会损伤鼻腔黏膜','洗鼻会导致感染','只有做完手术才需要洗鼻'],c:0,e:'大量RCT证实鼻腔冲洗可减轻鼻窦炎和过敏性鼻炎症状。使用生理盐水或专用冲洗液。',s:'Cochrane Review / ARIA'},
+    {m:'"鼻息肉是肿瘤"',q:'关于鼻息肉，哪个正确？',o:['鼻息肉是慢性炎症导致的黏膜水肿增生，不是肿瘤，极少数可癌变','鼻息肉是恶性肿瘤','鼻息肉必须手术','鼻息肉用药就能完全消除'],c:0,e:'鼻息肉与慢性鼻窦炎、哮喘、阿司匹林不耐受相关。首选鼻用激素，无效者考虑手术。',s:'《耳鼻咽喉科学》/ EPOS'},
+    {m:'"打喷嚏时要憋住"',q:'关于打喷嚏，哪个正确？',o:['憋住喷嚏可能导致气压伤(中耳炎、鼓膜穿孔甚至气胸)，应正确释放','憋喷嚏没关系','打喷嚏时应该捂住鼻子','频繁打喷嚏一定是感冒'],c:0,e:'憋住喷嚏时鼻咽部压力可达正常数十倍。可导致中耳气压伤、鼓膜穿孔，罕见情况可致气胸。',s:'《耳鼻咽喉科学》/ BMJ Case Reports'},
+    {m:'"过敏性鼻炎和哮喘没关系"',q:'关于过敏性鼻炎和哮喘的关系，哪个正确？',o:['过敏性鼻炎和哮喘是"同一气道，同一疾病"，约40%鼻炎患者合并哮喘','鼻炎和哮喘完全无关','治了鼻炎就不会得哮喘','只有鼻部症状才是鼻炎'],c:0,e:'ARIA指南强调上下气道联合管理。治疗鼻炎可改善哮喘控制。',s:'ARIA / GINA指南'}
+  ],
+  oral_dental:[
+    {m:'"牙齿不疼就不用看牙医"',q:'关于口腔检查，哪个正确？',o:['建议每6-12个月做一次口腔检查，许多口腔疾病早期无症状','牙不疼就不需要看牙医','只有牙疼才需要治疗','口腔检查没必要'],c:0,e:'龋齿、牙周病早期无症状。定期检查可在早期发现并治疗，避免后期复杂治疗。',s:'《口腔医学》/ ADA'},
+    {m:'"洗牙会让牙缝变大"',q:'关于洗牙(龈上洁治)，哪个正确？',o:['洗牙去除牙结石后暴露了原本被填满的牙缝，不是洗牙造成的','洗牙会让牙缝越来越大','洗牙会损伤牙釉质','洗牙一年不能超过一次'],c:0,e:'牙结石压迫牙龈导致萎缩。去除牙结石后牙缝显露是疾病的结果，不是洗牙的副作用。',s:'《口腔医学》/ ADA'},
+    {m:'"智齿都要拔"',q:'关于智齿(第三磨牙)，哪个正确？',o:['正位萌出、有对合牙、无龋坏的智齿可以保留，阻生智齿建议预防性拔除','所有智齿都必须拔','智齿拔了影响智力','智齿永远不会发炎'],c:0,e:'阻生智齿可导致冠周炎、邻牙龋坏、囊肿等。建议在25岁前评估是否需要预防性拔除。',s:'《口腔颌面外科学》/ AAOMS'},
+    {m:'"牙齿矫正只有小孩能做"',q:'关于正畸治疗，哪个正确？',o:['成人也可以做牙齿矫正，只是疗程可能比青少年长','只有12岁以下才能矫正','牙齿矫正会导致牙齿松动','矫正后不需要戴保持器'],c:0,e:'成人正畸可行但骨改建速度较慢。牙周病需先控制后矫正。终身佩戴保持器是关键。',s:'《口腔正畸学》'},
+    {m:'"口腔溃疡是上火"',q:'关于复发性口腔溃疡，哪个正确？',o:['复发性阿弗他溃疡病因不明，与免疫、遗传、压力等有关，不是单纯"上火"','口腔溃疡就是上火','口腔溃疡会癌变','维生素B2能治所有口腔溃疡'],c:0,e:'复发性阿弗他溃疡(RAS)患病率约20%。通常7-10天自愈。长期不愈合(>2周)需活检排除口腔癌。',s:'《口腔黏膜病学》'},
+    {m:'"牙齿发黄说明不健康"',q:'关于牙齿颜色，哪个正确？',o:['牙齿自然色偏微黄，牙釉质越透明越显下方黄色牙本质的颜色','健康的牙齿一定是纯白色的','牙齿越白越健康','美白牙膏能彻底美白牙齿'],c:0,e:'牙齿颜色由牙本质颜色和牙釉质透明度决定。过度美白可导致牙本质敏感和釉质损伤。',s:'《口腔医学》'},
+    {m:'"含氟牙膏对身体有害"',q:'关于含氟牙膏，哪个正确？',o:['适量氟化物可有效预防龋齿，3岁以下用米粒大小、3岁以上用豌豆大小即可安全使用','含氟牙膏有毒','含氟牙膏会导致氟中毒','无氟牙膏更好'],c:0,e:'氟化物是WHO推荐的龋齿预防措施。儿童牙膏用量：3岁以下米粒大，3-6岁豌豆大。',s:'WHO / ADA / 《口腔预防医学》'},
+    {m:'"牙龈出血说明刷牙太用力"',q:'关于牙龈出血，哪个正确？',o:['牙龈出血最常见的原因是牙龈炎(牙菌斑导致)，不是刷牙太用力','牙龈出血是因为刷牙太用力','牙龈出血不用管','只有缺维C才会牙龈出血'],c:0,e:'牙龈出血是牙龈炎的典型表现。正确刷牙(而非减少力度)+使用牙线+定期洁治可改善。',s:'《牙周病学》/ AAP'},
+    {m:'"补牙材料掉了一颗牙就废了"',q:'关于补牙后材料脱落，哪个正确？',o:['及时重新充填即可，拖延可能导致龋坏加深至需要根管治疗','材料掉了牙齿就保不住了','补牙材料不应该脱落','补牙后可以随便吃硬物'],c:0,e:'充填物脱落暴露牙体组织，细菌可继续侵入。及时复诊重新充填可避免问题加重。',s:'《口腔医学》'},
+    {m:'"孕妇不能看牙"',q:'关于孕期口腔治疗，哪个正确？',o:['孕中期(4-6个月)可以进行必要的口腔治疗，孕期口腔感染反而影响胎儿','整个孕期都不能看牙','孕期牙疼只能忍','口腔X光对孕妇绝对禁忌'],c:0,e:'孕期口腔感染(牙周病)与早产和低出生体重相关。孕中期可进行急症治疗。X光在防护下可安全进行。',s:'ACOG / 《口腔医学》'}
+  ],
+  throat_voice:[
+    {m:'"扁桃体发炎就要切除"',q:'关于扁桃体手术，哪个正确？',o:['反复发作(≥7次/年)或引起并发症才考虑切除，急性期首选抗生素治疗','扁桃体发炎就要切','扁桃体是无用器官','切除扁桃体影响免疫力'],c:0,e:'扁桃体切除指征：每年发作≥7次、引起呼吸困难、扁桃体周围脓肿等。免疫功能影响极小。',s:'《耳鼻咽喉科学》/ AAO-HNS'},
+    {m:'"声音嘶哑吃胖大海就行"',q:'关于声嘶，哪个正确？',o:['持续声嘶>2周需喉镜检查排除声带息肉、结节或喉癌，胖大海不是万能药','声嘶喝胖大海茶就好','声嘶只是上火','教师声嘶是正常的'],c:0,e:'声带息肉、结节(教师结节)、喉癌等都可导致声嘶。持续2周以上需喉镜检查。',s:'《耳鼻咽喉科学》'},
+    {m:'"慢性咽炎是上火引起的"',q:'关于慢性咽炎，哪个正确？',o:['慢性咽炎与胃食管反流、鼻后滴漏、烟酒刺激等有关，不是单纯"上火"','慢性咽炎就是上火','慢性咽炎无法治疗','含片能根治慢性咽炎'],c:0,e:'慢性咽炎病因多样：胃食管反流(LPR)、慢性鼻窦炎鼻后滴漏、过敏、烟酒等。需针对病因治疗。',s:'《耳鼻咽喉科学》'},
+    {m:'"儿童睡觉打呼说明睡得香"',q:'关于儿童腺样体肥大，哪个正确？',o:['儿童长期打鼾可能是腺样体肥大，可导致"腺样体面容"和发育迟缓','儿童打鼾说明睡得好','腺样体肥大不需要治疗','腺样体和扁桃体是一回事'],c:0,e:'腺样体肥大阻塞后鼻孔导致张口呼吸→腺样体面容(上颌前突、牙齿不齐)。影响生长发育。',s:'《耳鼻咽喉科学》'},
+    {m:'"咽喉反流和胃食管反流是一回事"',q:'关于咽喉反流(LPR)，哪个正确？',o:['LPR是胃内容物反流至咽喉部，症状与GERD不同，主要表现为声嘶和清嗓','LPR和GERD完全相同','LPR只影响食管','LPR只需要吃胃药'],c:0,e:'LPR反流量少但接触咽喉黏膜时间长。症状：声嘶、慢性清嗓、咽异物感。需PPI+生活方式调整。',s:'《耳鼻咽喉科学》/ AAO-HNS'},
+    {m:'"大声喊叫不会损伤声带"',q:'关于声带损伤，哪个正确？',o:['过度用声(喊叫、长时间说话)可导致声带小结、息肉甚至出血','大声说话不会伤声带','只有歌手才需要注意声带保护','声带损伤可以自愈'],c:0,e:'声带小结由反复机械性损伤导致，好发于教师、歌手等职业用声者。声带休息和发声训练是关键。',s:'《耳鼻咽喉科学》/ ASHA'},
+    {m:'"急性喉炎吃消炎药就行"',q:'关于急性会厌炎，哪个正确？',o:['急性会厌炎是耳鼻喉科急症，可迅速导致气道梗阻窒息，需紧急处理','急性喉炎只是小病','喉炎一定有声音嘶哑','急性喉炎不需要住院'],c:0,e:'急性会厌炎进展迅速，可数小时内导致完全气道梗阻。出现"三凹征"和流涎需紧急气管切开。',s:'《耳鼻咽喉科学》'},
+    {m:'"口臭只是口腔问题"',q:'关于口臭的原因，哪个正确？',o:['约85%口臭源于口腔(牙周病、舌苔)，但约15%与胃肠、呼吸系统疾病相关','口臭一定是口腔不卫生','口臭可以用漱口水根治','口臭只是上火'],c:0,e:'口臭主要由口腔厌氧菌产生硫化物导致。牙周病、舌苔厚是最常见原因。排除口腔原因后需查消化科。',s:'《口腔医学》/ 《消化病学》'},
+    {m:'"喉癌只有吸烟的人才会得"',q:'关于喉癌的危险因素，哪个正确？',o:['吸烟和饮酒是主要危险因素，但HPV感染也与喉癌相关，非吸烟者也可发病','喉癌只在吸烟者中发生','喉癌不能早期发现','喉癌一定需要全喉切除'],c:0,e:'喉癌危险因素：吸烟(风险增10-15倍)、饮酒、HPV感染、职业暴露(石棉等)。早期发现可保喉治疗。',s:'《耳鼻咽喉科学》/ NCCN'},
+    {m:'"口吃(结巴)是心理问题"',q:'关于口吃，哪个正确？',o:['口吃涉及遗传、神经发育和环境多因素，不是单纯心理问题','口吃是胆小造成的','口吃不需要治疗','口吃只有儿童才有'],c:0,e:'口吃患病率约5%(儿童)，约1%持续到成年。涉及大脑语言运动控制区域异常。言语治疗有效。',s:'《耳鼻咽喉科学》/ ASHA'}
+  ],
+  ob_pregnancy:[
+    {m:'"孕妇不能吃螃蟹会流产"',q:'关于孕期饮食禁忌，哪个正确？',o:['煮熟的螃蟹可以适量食用，流产与吃螃蟹无科学因果关系','孕妇不能吃螃蟹','孕期所有海鲜都不能吃','螃蟹性寒会导致流产'],c:0,e:'煮熟的螃蟹是优质蛋白来源。过敏体质者需注意。流产主要与胚胎染色体异常有关。',s:'《妇产科学》/ ACOG'},
+    {m:'"孕期不能用药"',q:'关于孕期用药，哪个正确？',o:['部分药物在孕期安全可用(如对乙酰氨基酚)，应遵医嘱而非自行停药','孕期绝对不能用药','所有药物都会致畸','中药比西药安全'],c:0,e:'FDA妊娠药物分级(现改为详细描述)。孕期可用药物：对乙酰氨基酚、部分抗生素(青霉素类)等。',s:'《妇产科学》/ ACOG'},
+    {m:'"胎教听莫扎特能让孩子变聪明"',q:'关于胎教，哪个正确？',o:['尚无科学证据证明特定音乐胎教能提高胎儿智力，但良好的孕期情绪环境有益','听莫扎特能提高胎儿智商','胎教越早越好','胎教没有任何作用'],c:0,e:'胎儿听觉系统孕24周后逐渐成熟。母亲情绪稳定、营养充足对胎儿发育比特定"胎教"更重要。',s:'《妇产科学》/ ACOG'},
+    {m:'"孕期不能运动"',q:'关于孕期运动，哪个正确？',o:['无禁忌症的孕妇推荐每周150分钟中等强度运动，有助控制体重和减少妊娠并发症','孕期必须卧床休息','孕期运动会导致流产','孕期只能散步不能做其他运动'],c:0,e:'ACOG推荐无禁忌症孕妇每周150分钟中等强度运动(如快走、游泳)。避免高风险运动和仰卧位。',s:'ACOG / WHO'},
+    {m:'"孕吐说明胎儿发育不好"',q:'关于妊娠剧吐，哪个正确？',o:['孕吐(妊娠早期恶心呕吐)与HCG水平升高有关，通常是正常妊娠的标志','孕吐说明胎儿有问题','孕吐越严重越危险','孕吐可以完全避免'],c:0,e:'约70-80%孕妇有不同程度孕吐。孕吐与低流产率相关。妊娠剧吐(持续呕吐、酮症)需住院治疗。',s:'《妇产科学》/ ACOG'},
+    {m:'"孕期B超做多了对胎儿有害"',q:'关于孕期超声检查，哪个正确？',o:['诊断性超声无电离辐射，按规范进行的B超检查对胎儿安全无害','B超有辐射会导致畸形','整个孕期做一次B超就够','B超能查出所有畸形'],c:0,e:'超声使用声波非电离辐射。产科超声检查已有数十年安全记录。常规产检3-5次B超是推荐的。',s:'ACOG / 《妇产科学》'},
+    {m:'"孕期必须吃两个人的饭"',q:'关于孕期营养，哪个正确？',o:['孕中晚期仅需额外增加约300-450kcal/天，关键是营养质量而非数量','孕期要吃两人份','孕期越胖越好','孕期不需要额外补充营养'],c:0,e:'孕期推荐增重：BMI正常者11.5-16kg。过度增重增加妊娠糖尿病、巨大儿等风险。',s:'《妇产科学》/ IOM'},
+    {m:'"唐氏筛查高风险就一定是唐氏儿"',q:'关于唐氏筛查，哪个正确？',o:['唐氏筛查是风险评估不是确诊，高风险需进一步做无创DNA或羊水穿刺确认','唐筛高风险就是唐氏儿','唐筛低风险就一定正常','所有孕妇都必须做羊水穿刺'],c:0,e:'唐筛假阳性率约5%。高风险者可选择无创产前检测(NIPT，准确率>99%)或羊水穿刺(金标准)确诊。',s:'《妇产科学》/ ACOG'},
+    {m:'"孕妇左侧卧位是唯一正确睡姿"',q:'关于孕期睡姿，哪个正确？',o:['孕晚期建议侧卧位(左或右均可)，短期仰卧不会对胎儿造成危害','整个孕期都必须左侧卧','仰卧会导致胎儿缺氧','孕期不能右侧卧'],c:0,e:'孕晚期子宫增大可能压迫下腔静脉影响回心血量。但短时间仰卧不会导致严重问题。',s:'《妇产科学》/ ACOG'},
+    {m:'"妊娠期糖尿病产后就好了"',q:'关于GDM，哪个正确？',o:['GDM产后血糖多恢复正常，但未来发展为2型糖尿病的风险增加7倍，需长期随访','GDM产后一定恢复','GDM不影响胎儿','GDM不需要控制饮食'],c:0,e:'约50%GDM患者在产后10年内发展为2型糖尿病。产后6-12周需复查OGTT，此后每1-3年复查。',s:'《妇产科学》/ ADA'}
+  ],
+  ob_delivery:[
+    {m:'"顺产比剖腹产好"',q:'关于分娩方式，哪个正确？',o:['各有利弊，应根据母婴情况由医生评估，不存在绝对的"更好"','顺产一定比剖腹产好','剖腹产不疼所以更好','剖腹产的孩子更聪明'],c:0,e:'顺产：恢复快、并发症少但有会阴损伤风险。剖宫产：手术风险但可处理难产。应个体化选择。',s:'《妇产科学》/ ACOG'},
+    {m:'"无痛分娩会影响胎儿智力"',q:'关于分娩镇痛(无痛分娩)，哪个正确？',o:['硬膜外分娩镇痛药物浓度极低，对胎儿安全无明显影响','无痛分娩会影响宝宝','无痛分娩会导致腰痛','无痛分娩会导致难产'],c:0,e:'硬膜外镇痛是目前最有效的分娩镇痛方法。药物剂量仅为剖宫产的1/10-1/5。',s:'《妇产科学》/ ASA'},
+    {m:'"产后不能洗头洗澡"',q:'关于产褥期护理，哪个正确？',o:['产后可以淋浴(避免盆浴)，保持清洁有助预防感染','产后一个月不能洗澡','产后必须捂月子','产后洗头会导致头痛'],c:0,e:'WHO建议产后即可淋浴。会阴伤口保持清洁有助愈合。传统"月子"禁忌缺乏科学依据。',s:'《妇产科学》/ WHO'},
+    {m:'"母乳喂养越久越好没有上限"',q:'关于母乳喂养时长，哪个正确？',o:['WHO推荐纯母乳喂养6个月，之后添加辅食继续喂养至2岁或以上','母乳喂养越久越好无上限','6个月后母乳就没营养了','母乳喂养必须严格按时喂'],c:0,e:'WHO建议：纯母乳6个月→添加辅食+继续母乳喂养至2岁+。母乳成分随婴儿需求变化。',s:'WHO / 《儿科学》'},
+    {m:'"剖宫产的孩子更聪明"',q:'关于分娩方式和智力，哪个正确？',o:['分娩方式与孩子智力无关，智力主要由遗传和后天环境决定','剖宫产的孩子更聪明','顺产时挤压会损伤大脑','早产的孩子一定不聪明'],c:0,e:'无科学证据支持分娩方式影响智力。智力遗传率约50%，另50%由教育、营养等环境因素决定。',s:'《儿科学》/ 行为遗传学'},
+    {m:'"产后恶露是月经"',q:'关于产后恶露，哪个正确？',o:['恶露是子宫蜕膜脱落的正常生理过程，通常持续4-6周，不是月经','恶露就是月经','恶露超过一周就不正常','恶露量越多越好说明排得干净'],c:0,e:'恶露分血性(3-4天)→浆液性(10天)→白色(3周)。异常：恶露有臭味、量突然增多需就医。',s:'《妇产科学》'},
+    {m:'"催产素(催产针)对胎儿有害"',q:'关于引产/催产，哪个正确？',o:['规范使用的催产素安全有效，是处理过期妊娠和产程异常的重要手段','催产素会导致胎儿缺氧','催产素只用于难产','催产素使用后必须剖宫产'],c:0,e:'催产素引产有严格监测方案(持续胎心监护、定时调整剂量)。滥用可致宫缩过强，规范使用安全。',s:'《妇产科学》/ ACOG'},
+    {m:'"胎位不正只能剖腹产"',q:'关于臀位(胎位不正)，哪个正确？',o:['孕37周前可尝试外倒转术纠正胎位，部分臀位条件好的也可尝试阴道分娩','臀位只能剖腹产','臀位不需要处理','孕晚期胎位不会再变'],c:0,e:'孕36-37周可尝试外倒转术(ECV，成功率约50-60%)。臀位阴道分娩需经验丰富医生评估。',s:'《妇产科学》/ ACOG'},
+    {m:'"产后抑郁是矫情"',q:'关于产后抑郁症，哪个正确？',o:['产后抑郁是激素剧烈波动+心理社会因素导致的真实疾病，发病率约10-15%','产后抑郁是性格问题','产后抑郁不需要治疗','产后每个妈妈都会开心'],c:0,e:'产后抑郁表现为持续情绪低落、对婴儿缺乏兴趣、失眠、自责等。严重者可有自杀或伤害婴儿想法。',s:'《妇产科学》/ DSM-5'},
+    {m:'"脐带绕颈必须剖腹产"',q:'关于脐带绕颈，哪个正确？',o:['脐带绕颈(约20-30%胎儿)大多数不影响阴道分娩，需加强胎心监护','脐带绕颈一定剖腹产','脐带绕颈很危险','脐带绕颈可以预防'],c:0,e:'脐带绕颈常见，多数松绕不影响血供。紧绕或绕颈圈数多时需评估是否影响胎心。',s:'《妇产科学》'}
+  ],
+  neo_newborn:[
+    {m:'"新生儿黄疸都要照蓝光"',q:'关于新生儿黄疸，哪个正确？',o:['生理性黄疸(足月儿<12.9mg/dL)可自行消退，超过阈值才需要光疗','所有黄疸都要照蓝光','黄疸一定是病理性的','母乳性黄疸必须停母乳'],c:0,e:'约60%足月儿出现生理性黄疸。病理性黄疸(24h内出现、进展快、程度重)需积极治疗。',s:'《新生儿学》/ AAP'},
+    {m:'"早产儿一定发育落后"',q:'关于早产儿预后，哪个正确？',o:['大多数晚期早产儿(34-36周)经规范随访发育接近足月儿','早产儿一定落后','早产儿不能追赶生长','早产儿不需要特别护理'],c:0,e:'早产儿需矫正月龄评估发育。极早产儿(<28周)有一定神经发育风险，但早期干预可改善预后。',s:'《新生儿学》/ AAP'},
+    {m:'"新生儿不需要做听力筛查"',q:'关于新生儿筛查，哪个正确？',o:['新生儿听力筛查可在出生后早期发现听力障碍，是法定筛查项目','听力筛查不重要','筛查通过就永远没问题','等孩子大了再查也行'],c:0,e:'新生儿听力筛查(耳声发射/自动听性脑干反应)是早期发现听力障碍的关键手段。',s:'《新生儿学》/ JCIH'},
+    {m:'"新生儿乳房肿大要挤出来"',q:'关于新生儿乳腺肿大，哪个正确？',o:['新生儿乳腺肿大是母体雌激素影响的正常现象，几周后自行消退，不要挤压','必须挤出乳汁','肿大说明有疾病','只有女婴才会乳房肿大'],c:0,e:'新生儿乳腺肿大(不论男女)由母体雌激素经胎盘传入导致。挤压可导致感染(乳腺炎)。',s:'《新生儿学》'},
+    {m:'"新生儿马牙要挑破"',q:'关于马牙(上皮珠)，哪个正确？',o:['马牙是牙板上皮残留形成的正常结构，会自行消退，挑破可导致严重感染','马牙必须挑破','马牙会影响吃奶','马牙是牙齿发育异常'],c:0,e:'马牙(上皮珠)是牙龈上的白色小珠，是正常发育现象。挑破可导致口腔感染甚至败血症。',s:'《新生儿学》'},
+    {m:'"新生儿打嗝说明着凉了"',q:'关于新生儿打嗝，哪个正确？',o:['新生儿膈肌发育不成熟，打嗝是正常生理现象，与着凉无直接关系','打嗝一定是着凉','新生儿不应该打嗝','打嗝需要吃药'],c:0,e:'新生儿打嗝由膈肌痉挛引起，是正常发育过程。喂奶后竖抱拍嗝有助减少。',s:'《新生儿学》'},
+    {m:'"新生儿不用刷牙"',q:'关于新生儿口腔护理，哪个正确？',o:['出生后应用湿纱布清洁口腔和牙龈，第一颗牙萌出后开始刷牙','新生儿不需要口腔护理','等牙齿长齐了再刷牙','新生儿用清水刷牙就够'],c:0,e:'出生后即应开始口腔清洁(湿纱布擦拭牙龈)。第一颗乳牙萌出(约6个月)后用含氟牙膏刷牙。',s:'ADA / 《口腔医学》'},
+    {m:'"新生儿脐带脱落前不能碰水"',q:'关于脐带护理，哪个正确？',o:['脐带残端应保持清洁干燥，可以正常洗澡(之后擦干脐部)，不要用酒精擦拭','脐带不能碰任何水','脐带必须用酒精消毒','脐带脱落越快越好'],c:0,e:'WHO建议：脐带保持清洁干燥，不要涂抹任何物质。脱落通常在出生后7-14天。',s:'WHO / 《新生儿学》'},
+    {m:'"新生儿哭就是饿了"',q:'关于新生儿哭闹，哪个正确？',o:['新生儿哭闹原因多样：饥饿、尿布湿、胀气、需要安抚等，不一定是饿','哭一定是饿了','新生儿不应该哭太多','哭闹说明孩子有问题'],c:0,e:'新生儿通过哭表达需求。常见原因：饥饿、困倦、需要拥抱、肠绞痛(3月龄内常见)。',s:'《儿科学》'},
+    {m:'"新生儿穿越多越好不能着凉"',q:'关于新生儿穿衣，哪个正确？',o:['新生儿穿衣应比成人多一层即可，过度包裹可导致捂热综合征','新生儿要穿很多','新生儿怕冷不怕热','新生儿必须戴帽子'],c:0,e:'捂热综合征(过度包裹)可导致高热、脱水甚至死亡。摸颈后温热即可判断冷暖。',s:'《新生儿学》/ AAP'}
+  ],
+  ped_common:[
+    {m:'"小儿发烧要赶紧退烧"',q:'关于儿童发热处理，哪个正确？',o:['体温<38.5°C精神好可观察，>38.5°C或不适可用退热药(对乙酰氨基酚/布洛芬)','发烧必须立刻退烧','发烧会烧坏脑子','物理降温比药物更有效'],c:0,e:'发热是免疫反应，不会"烧坏脑子"(热性惊厥除外)。退热药目标是缓解不适而非降至正常。',s:'《儿科学》/ AAP'},
+    {m:'"孩子腹泻要禁食"',q:'关于儿童腹泻，哪个正确？',o:['腹泻期间应继续喂养(少量多餐)，关键是预防脱水(口服补液盐)','腹泻时不能吃东西','腹泻必须用抗生素','止泻药适合儿童使用'],c:0,e:'腹泻期间继续喂养有助肠道黏膜修复。ORS(口服补液盐)是预防和治疗脱水的首选。',s:'《儿科学》/ WHO'},
+    {m:'"热性惊厥会发展为癫痫"',q:'关于热性惊厥，哪个正确？',o:['单纯性热性惊厥预后良好，不增加癫痫风险，多在6岁前自行消失','热性惊厥一定会发展为癫痫','热性惊厥时要掐人中','热性惊厥需要长期服药'],c:0,e:'热性惊厥发生率约2-5%。单纯性热性惊厥(全面性、<15分钟、24h内1次)癫痫转化率仅1-2%。',s:'《儿科学》/ AAP'},
+    {m:'"川崎病是少见病不用了解"',q:'关于川崎病，哪个正确？',o:['川崎病是儿童获得性心脏病首要原因，早期IVIG治疗可显著降低冠脉损害','川崎病很罕见不用管','川崎病只在亚洲发生','川崎病就是普通感冒'],c:0,e:'川崎病好发于5岁以下，主要表现：持续高热5天+双侧结膜充血+口唇皲裂+皮疹+肢端肿胀+颈淋巴结肿大。',s:'《儿科学》/ AHA'},
+    {m:'"儿童感冒要用抗生素"',q:'关于儿童感冒用药，哪个正确？',o:['普通感冒90%以上由病毒引起，抗生素无效，对症治疗为主','感冒必须用抗生素','感冒药越贵越有效','感冒不治疗会变肺炎'],c:0,e:'儿童普通感冒是自限性疾病(7-10天)。抗生素不缩短病程，滥用增加耐药性。',s:'《儿科学》/ AAP'},
+    {m:'"孩子便秘多吃香蕉就行"',q:'关于儿童功能性便秘，哪个正确？',o:['增加膳食纤维(蔬菜、全谷物)和水分摄入比单吃香蕉更有效','香蕉是最佳通便食物','便秘不严重不用管','开塞露可以长期使用'],c:0,e:'儿童功能性便秘需综合：高纤维饮食+充足水分+排便训练。部分未熟香蕉含鞣酸反而加重便秘。',s:'《儿科学》/ NASPGHAN'},
+    {m:'"儿童哮喘长大就好了"',q:'关于儿童哮喘，哪个正确？',o:['约50-60%儿童哮喘到青春期症状缓解，但气道高反应性可能持续，需规范管理','哮喘一定能在青春期自愈','哮喘不能运动','哮喘只需要发作时用药'],c:0,e:'儿童哮喘规范使用吸入性糖皮质激素(ICS)可控制症状、改善肺功能、减少急性发作。',s:'《儿科学》/ GINA'},
+    {m:'"孩子不爱吃饭是缺锌"',q:'关于儿童食欲不振，哪个正确？',o:['食欲不振原因多样(零食过多、运动不足、心理因素等)，不能简单归因于缺锌','不爱吃饭一定是缺锌','锌剂可以长期服用','孩子胖才健康'],c:0,e:'锌缺乏可导致食欲下降，但大多数儿童食欲不振与不良饮食习惯有关。盲目补锌可致铜缺乏。',s:'《儿科学》/ 《营养学》'},
+    {m:'"手足口病是小病不用怕"',q:'关于手足口病重症，哪个正确？',o:['大多数轻症可自愈，但EV71型可导致脑干脑炎、神经源性肺水肿等致命并发症','手足口病都是轻症','手足口病没有疫苗','手足口病只有夏天才有'],c:0,e:'EV71疫苗可预防EV71感染。重症预警：持续高热、呕吐、肢体抖动、呼吸心率增快。',s:'《传染病学》/ CDC'},
+    {m:'"小儿用药按成人剂量减半"',q:'关于儿童用药剂量，哪个正确？',o:['儿童用药应按体重(mg/kg)或体表面积计算，不是简单减半','儿童药量是成人一半','成人药掰半给孩子吃','儿童用药不需要特别计算'],c:0,e:'儿童肝肾功能发育不全，药物代谢与成人不同。按体重精确计算剂量是儿童用药安全的基础。',s:'《儿科学》/ AAP'}
+  ],
+  ped_growth:[
+    {m:'"孩子比同龄矮就是矮小症"',q:'关于矮小症诊断，哪个正确？',o:['身高低于同年龄同性别第3百分位或低于2个标准差才诊断矮小，需查骨龄和激素','比同学矮就是矮小症','矮小症不需要治疗','矮小只能打生长激素'],c:0,e:'矮小症需排除体质性青春期延迟、家族性矮小等。骨龄、IGF-1、甲状腺功能等是必要检查。',s:'《儿科学》/ ESPE'},
+    {m:'"说话晚的孩子更聪明"',q:'关于语言发育迟缓，哪个正确？',o:['语言发育迟缓(2岁无有意义词汇)需评估排除听力障碍、自闭症等，不是"大器晚成"','说话晚说明更聪明','语言迟缓不需要干预','等上学了自然就会说'],c:0,e:'语言发育关键期2-3岁。2岁词汇<50个、3岁无短句需全面评估。早期干预效果最佳。',s:'《儿科学》/ ASHA'},
+    {m:'"ADHD(多动症)是教育问题不是病"',q:'关于ADHD，哪个正确？',o:['ADHD是神经发育障碍，涉及前额叶多巴胺和去甲肾上腺素系统异常，是真正的疾病','ADHD只是教养不好','ADHD不需要吃药','只有男孩才得ADHD'],c:0,e:'ADHD患病率约5-7%。大脑执行功能缺陷导致注意力不集中/多动/冲动。药物+行为治疗效果最佳。',s:'《儿科学》/ DSM-5 / AAP'},
+    {m:'"自闭症是因为家长不关心孩子"',q:'关于自闭症谱系障碍(ASD)，哪个正确？',o:['ASD是神经发育障碍，与遗传高度相关(遗传率80%+)，不是养育方式导致','自闭症因为缺少关爱','自闭症可以完全治愈','自闭症儿童没有情感'],c:0,e:'ASD遗传率高达80%以上。早期行为干预(2-3岁开始)可显著改善社交和语言功能。',s:'《儿科学》/ DSM-5 / Autism Speaks'},
+    {m:'"孩子胖一点没关系长大就瘦了"',q:'关于儿童肥胖，哪个正确？',o:['约80%肥胖儿童成年后仍肥胖，增加2型糖尿病、脂肪肝等风险','孩子胖说明健康','小时候胖长大自然会瘦','儿童不需要控制体重'],c:0,e:'儿童期肥胖可导致代谢综合征、心理问题。家庭饮食习惯调整和增加运动是关键干预。',s:'《儿科学》/ AAP'},
+    {m:'"骨龄比实际年龄大就是性早熟"',q:'关于性早熟，哪个正确？',o:['性早熟诊断标准：女孩8岁前、男孩9岁前出现第二性征，需综合评估','骨龄大就是性早熟','性早熟不影响最终身高','性早熟不需要治疗'],c:0,e:'中枢性性早熟(GnRH依赖型)可使用GnRH类似物抑制性腺轴，延缓骨龄进展改善成年身高。',s:'《儿科学》/ ESPE/LWPES'},
+    {m:'"孩子近视了长大做手术就行"',q:'关于儿童近视防控，哪个正确？',o:['青少年近视进展期应积极控制(户外活动、OK镜、低浓度阿托品)，而非等待手术','等18岁做手术就好','近视控制没有用','户外活动对近视无帮助'],c:0,e:'高度近视(>600mm)增加视网膜脱离、黄斑变性等风险。控制进展比等待手术更重要。',s:'《眼科学》/ AAO'},
+    {m:'"婴儿枕秃是缺钙"',q:'关于婴儿枕秃，哪个正确？',o:['枕秃是婴儿仰卧位头部摩擦导致的正常现象，与缺钙无直接关系','枕秃一定是缺钙','枕秃需要大量补钙','枕秃说明有佝偻病'],c:0,e:'婴儿枕秃由后枕部反复摩擦导致，是正常生理现象。佝偻病诊断需结合血钙、磷、碱性磷酸酶和骨X线。',s:'《儿科学》'},
+    {m:'"母乳喂养的孩子不需要补充维D"',q:'关于婴儿维D补充，哪个正确？',o:['母乳中维D含量不足，纯母乳婴儿应从出生后数天开始补充400IU/天维D','母乳营养全面不需要补任何东西','母乳喂养不需要补维D','配方奶喂养也不需要补维D'],c:0,e:'AAP推荐所有婴儿从出生后不久开始补充400IU/天维D，无论母乳还是配方奶喂养。',s:'AAP / 《儿科学》'},
+    {m:'"孩子长得快不需要担心早熟"',q:'关于儿童生长监测，哪个正确？',o:['生长速度突然加快(>正常2倍)可能是性早熟信号，需查骨龄和激素','长得快说明发育好','生长曲线不重要','定期量身高没意义'],c:0,e:'定期监测生长曲线可早期发现生长异常。生长速度突然加速或减慢都需关注。',s:'《儿科学》/ WHO'}
+  ]
+};
+
+// ============================
+// MAP GENERATION
+// ============================
+function genMap(regionId){
+  const region=REGIONS[regionId];
+  const mapW=2400,mapH=1800,tiles=[],walls=[],decorations=[],monsters=[];
+  for(let y=0;y<mapH/40;y++){tiles[y]=[];for(let x=0;x<mapW/40;x++)tiles[y][x]=Math.random()>.92?2:1}
+  const wc=15+Math.floor(Math.random()*10);
+  for(let i=0;i<wc;i++){
+    const h=Math.random()>.5,len=3+Math.floor(Math.random()*8),sx=Math.floor(Math.random()*(mapW/40-len-4))+2,sy=Math.floor(Math.random()*(mapH/40-len-4))+2;
+    for(let j=0;j<(h?len:3);j++)for(let k=0;k<(h?3:len);k++)walls.push({x:(sx+(h?j:k))*40,y:(sy+(h?k:j))*40,w:40,h:40});
+  }
+  for(let i=0;i<50+Math.floor(Math.random()*30);i++){
+    const types=['circle','dot','ring'];
+    decorations.push({x:Math.random()*mapW,y:Math.random()*mapH,type:types[Math.floor(Math.random()*3)],size:4+Math.random()*16,alpha:.1+Math.random()*.3,pulse:Math.random()*Math.PI*2,pulseSpeed:.01+Math.random()*.03});
+  }
+  // Place monsters (one per question, up to 10)
+  const qs=S.regionQuestions;
+  const positions=[];
+  for(let i=0;i<qs.length;i++){
+    let mx,my,valid,att=0;
+    do{mx=200+Math.random()*(mapW-400);my=200+Math.random()*(mapH-400);valid=true;
+      for(const w of walls){if(Math.abs(mx-w.x)<80&&Math.abs(my-w.y)<80){valid=false;break}}
+      for(const mp of positions){if(Math.hypot(mx-mp.x,my-mp.y)<160){valid=false;break}}
+      att++;
+    }while(!valid&&att<100);
+    positions.push({x:mx,y:my});
+    if(!S.monstersDefeated[`${S.currentWorld}_${regionId}_${i}`]){
+      monsters.push({x:mx,y:my,w:36,h:36,qIndex:i,bobOffset:Math.random()*Math.PI*2,glowAlpha:.3+Math.random()*.3});
+    }
+  }
+  return{tiles,walls,decorations,monsters,exit:{x:mapW/2,y:60,w:50,h:50},mapW,mapH,region};
+}
+
+// ============================
+// RENDER
+// ============================
+const _colorCache={};function adjustColor(hex,a){const k=hex+a;if(_colorCache[k])return _colorCache[k];const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);const v=`rgba(${r},${g},${b},${a})`;if(Object.keys(_colorCache).length<200)_colorCache[k]=v;return v}
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
+function inView(x,y,m){return x>S.camera.x-m&&x<S.camera.x+W()+m&&y>S.camera.y-m&&y<S.camera.y+H()+m}
+
+function drawMap(map){
+  const{region}=map;
+  ctx.fillStyle=region.bgColor||'#0a0a1a';ctx.fillRect(0,0,W(),H());
+  ctx.save();ctx.translate(-S.camera.x,-S.camera.y);
+  try{
+    const ts=40,stx=Math.max(0,Math.floor(S.camera.x/ts)),sty=Math.max(0,Math.floor(S.camera.y/ts)),etx=Math.min(map.mapW/ts,stx+Math.ceil(W()/ts)+2),ety=Math.min(map.mapH/ts,sty+Math.ceil(H()/ts)+2);
+    for(let ty=sty;ty<ety;ty++)for(let tx=stx;tx<etx;tx++){const tile=(map.tiles[ty]&&map.tiles[ty][tx])||1;ctx.fillStyle=tile===2?adjustColor(region.color,.15):adjustColor(region.color,.08);ctx.fillRect(tx*ts,ty*ts,ts,ts)}
+  }catch(e){console.error('tiles:',e)}
+  for(const d of map.decorations){if(!inView(d.x,d.y,30))continue;d.pulse+=d.pulseSpeed;ctx.globalAlpha=d.alpha*(.6+.4*Math.sin(d.pulse));ctx.fillStyle=region.color;if(d.type==='circle'){ctx.beginPath();ctx.arc(d.x,d.y,d.size,0,Math.PI*2);ctx.fill()}else if(d.type==='dot'){ctx.fillRect(d.x-2,d.y-2,4,4)}else{ctx.beginPath();ctx.arc(d.x,d.y,d.size,0,Math.PI*2);ctx.strokeStyle=region.color;ctx.lineWidth=1.5;ctx.stroke()}ctx.globalAlpha=1}
+  for(const w of map.walls){if(!inView(w.x,w.y,50))continue;ctx.fillStyle=adjustColor(region.color,.3);roundRect(ctx,w.x+2,w.y+2,w.w-4,w.h-4,6);ctx.fill();ctx.strokeStyle=adjustColor(region.color,.5);ctx.lineWidth=1;roundRect(ctx,w.x+2,w.y+2,w.w-4,w.h-4,6);ctx.stroke()}
+  // Exit portal removed - using summary card instead
+  // Monsters — batch font setup
+  ctx.font='32px sans-serif';ctx.textAlign='center';
+  for(const m of map.monsters){if(!inView(m.x,m.y,40))continue;m.bobOffset+=.04;const by=m.y+Math.sin(m.bobOffset)*6;ctx.globalAlpha=m.glowAlpha*(.5+.5*Math.sin(S.animFrame*.03));ctx.fillStyle='#e63946';ctx.beginPath();ctx.arc(m.x,by,28,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.fillText('👾',m.x,by+10);ctx.font='11px sans-serif';ctx.fillStyle='#ff6b6b';ctx.fillText(`#${m.qIndex+1}`,m.x,by-22);ctx.font='32px sans-serif'}
+  // Player
+  drawPlayer();
+  // Particles — swap-and-pop instead of splice
+  for(let i=S.particles.length-1;i>=0;i--){const p=S.particles[i];p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;if(p.life<=0){S.particles[i]=S.particles[S.particles.length-1];S.particles.pop();continue}ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
+  // Damage numbers — swap-and-pop
+  for(let i=S.damageNumbers.length-1;i>=0;i--){const d=S.damageNumbers[i];d.y-=.8;d.life-=.015;if(d.life<=0){S.damageNumbers[i]=S.damageNumbers[S.damageNumbers.length-1];S.damageNumbers.pop();continue}ctx.globalAlpha=d.life;ctx.font=`bold ${d.size}px sans-serif`;ctx.textAlign='center';ctx.fillStyle=d.color;ctx.fillText(d.text,d.x,d.y);ctx.globalAlpha=1}
+  ctx.restore();
+}
+
+function drawPlayer(){
+  const p=S.player,cx=p.x,cy=p.y;
+  ctx.globalAlpha=.3;ctx.fillStyle='#00b4d8';ctx.beginPath();ctx.arc(cx,cy,22,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  ctx.fillStyle='#f0f0f0';ctx.beginPath();
+  for(let i=0;i<12;i++){const a=(i/12)*Math.PI*2,r=12+Math.sin(S.animFrame*.08+i*1.2)*3,px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}
+  ctx.closePath();ctx.fill();ctx.strokeStyle='#d0d0d0';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#9b59b6';ctx.beginPath();ctx.arc(cx+Math.sin(S.animFrame*.05)*1.5,cy-1,5,0,Math.PI*2);ctx.fill();
+  const eo=p.facing==='left'?-3:p.facing==='right'?3:0,ey=p.facing==='up'?-2:p.facing==='down'?1:0;
+  ctx.fillStyle='#222';ctx.beginPath();ctx.arc(cx-4+eo,cy-3+ey,2,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(cx+4+eo,cy-3+ey,2,0,Math.PI*2);ctx.fill();
+}
+
+function drawMinimap(map){
+  const mc=document.getElementById('minimapCanvas'),mctx=mc.getContext('2d');
+  mctx.clearRect(0,0,160,160);mctx.fillStyle='rgba(0,0,0,.4)';mctx.fillRect(0,0,160,160);
+  const sx=160/map.mapW,sy=160/map.mapH;
+  mctx.fillStyle=adjustColor(map.region.color,.4);for(const w of map.walls)mctx.fillRect(w.x*sx,w.y*sy,Math.max(2,w.w*sx),Math.max(2,w.h*sy));
+  mctx.fillStyle='#e63946';for(const m of map.monsters){mctx.beginPath();mctx.arc(m.x*sx,m.y*sy,3,0,Math.PI*2);mctx.fill()}
+  // minimap exit dot removed
+  mctx.fillStyle='#00b4d8';mctx.beginPath();mctx.arc(S.player.x*sx,S.player.y*sy,4,0,Math.PI*2);mctx.fill();
+  mctx.strokeStyle='rgba(255,255,255,.3)';mctx.lineWidth=1;mctx.strokeRect(S.camera.x*sx,S.camera.y*sy,W()*sx,H()*sy);
+}
+
+// ============================
+// GAME LOGIC
+// ============================
+function update(){
+  if(S.screen!=='exploring')return;
+  const p=S.player;let dx=0,dy=0;
+  if(S.keys.ArrowLeft||S.keys.a||S.keys.A||S.touchDir.x<0){dx=-p.speed;p.facing='left'}
+  if(S.keys.ArrowRight||S.keys.d||S.keys.D||S.touchDir.x>0){dx=p.speed;p.facing='right'}
+  if(S.keys.ArrowUp||S.keys.w||S.keys.W||S.touchDir.y<0){dy=-p.speed;p.facing='up'}
+  if(S.keys.ArrowDown||S.keys.s||S.keys.S||S.touchDir.y>0){dy=p.speed;p.facing='down'}
+  if(dx&&dy){dx*=.707;dy*=.707}
+  const map=S.currentMap,nx=p.x+dx,ny=p.y+dy;
+  if(!collides(nx,p.y,map))p.x=nx;if(!collides(p.x,ny,map))p.y=ny;
+  p.x=Math.max(20,Math.min(map.mapW-20,p.x));p.y=Math.max(20,Math.min(map.mapH-20,p.y));
+  S.camera.x=p.x-W()/2;S.camera.y=p.y-H()/2;
+  S.camera.x=Math.max(0,Math.min(map.mapW-W(),S.camera.x));S.camera.y=Math.max(0,Math.min(map.mapH-H(),S.camera.y));
+  // Monster collision
+  for(let i=map.monsters.length-1;i>=0;i--){const m=map.monsters[i];if(Math.hypot(p.x-m.x,p.y-m.y)<40){startBattle(m,map);break}}
+  // Exit
+  // Portal collision removed - using summary card instead
+  // Particles
+  if(dx||dy){S._st=(S._st||0)+1;if(S._st%12===0)playSound('step');if(Math.random()>.6)S.particles.push({x:p.x+(Math.random()-.5)*10,y:p.y+(Math.random()-.5)*10,vx:(Math.random()-.5)*.5,vy:(Math.random()-.5)*.5,size:2+Math.random()*3,life:.6,decay:.02,color:'#00b4d8'})}
+  S.animFrame++;
+}
+function collides(x,y,map){const r=10;for(const w of map.walls)if(x+r>w.x&&x-r<w.x+w.w&&y+r>w.y&&y-r<w.y+w.h)return true;return false}
+
+// ============================
+// BATTLE SYSTEM
+// ============================
+function startBattle(monster,map){
+  Logger.trace('startBattle',{q:monster.qIndex+1,region:S.currentRegion});
+  playSound('encounter');
+  S.screen='battle';
+  const q=S.regionQuestions[monster.qIndex];
+  // Shuffle options
+  const indices=[0,1,2,3];for(let i=3;i>0;i--){const j=Math.floor(Math.random()*(i+1));[indices[i],indices[j]]=[indices[j],indices[i]]}
+  const shuffledOpts=indices.map(i=>q.o[i]);
+  const newCorrect=indices.indexOf(q.c);
+  S.battleData={monster,map,q:{m:q.m,q:q.q,o:shuffledOpts,c:newCorrect,e:q.e,s:q.s},answered:false};
+
+  document.getElementById('battleOverlay').classList.add('active');
+  document.getElementById('battleEmoji').textContent='👾';
+  document.getElementById('battleMonsterName').textContent=`误区病毒 #${monster.qIndex+1}`;
+  document.getElementById('battleProgress').textContent=`本关进度：${S.qIndex} / ${S.regionQuestions.length}`;
+  document.getElementById('battleMisconception').textContent=`⚠️ 误区：${q.m}`;
+  document.getElementById('battlePrompt').textContent=q.q;
+
+  const od=document.getElementById('battleOptions');od.innerHTML='';
+  shuffledOpts.forEach((opt,i)=>{
+    const btn=document.createElement('button');btn.className='battle-option';btn.textContent=`${['A','B','C','D'][i]}. ${opt}`;
+    btn.onclick=()=>handleAnswer(i);od.appendChild(btn);
+  });
+  document.getElementById('battleResult').classList.remove('show','cr','wr');
+  document.getElementById('resultBtn').style.display='none';
+  // GSAP entrance
+  gsap.from('#battleEmoji',{scale:0,rotation:-30,duration:.5,ease:'back.out(2)'});
+  gsap.from('#battleMonsterName',{y:20,opacity:0,duration:.4,delay:.2});
+}
+
+function handleAnswer(idx){
+  if(S.battleData.answered)return;S.battleData.answered=true;
+  const data=S.battleData,correct=data.q.c;
+  document.querySelectorAll('.battle-option').forEach((opt,i)=>{opt.classList.add('disabled');if(i===correct)opt.classList.add('correct');if(i===idx&&idx!==correct)opt.classList.add('wrong')});
+  const rd=document.getElementById('battleResult'),rt=document.getElementById('resultTitle'),re=document.getElementById('resultExplain'),rb=document.getElementById('resultBtn');
+  if(idx===correct){S.correctCount++;Logger.trace('handleAnswer','✅ 正确');playSound('correct');rd.className='battle-result show cr';rt.textContent='✅ 正确！误区病毒被消灭！'}
+  else{S.wrongCount++;Logger.warn('handleAnswer','❌ 错误',{hp:S.player.hp-20,region:S.currentRegion});S.player.hp=Math.max(0,S.player.hp-20);playSound('wrong');rd.className='battle-result show wr';rt.textContent='❌ 错误！你受到了误区伤害！';rb.textContent='➡️ 继续'}
+  re.innerHTML=`<strong>📖 科学解读：</strong>${data.q.e}<br><br><em>来源：${data.q.s}</em>`;
+  rb.style.display='inline-block';rb.textContent=idx===correct?'🎉 继续':'➡️ 继续';
+  updateHUD();
+}
+
+function battleContinue(){
+  const data=S.battleData;
+  // Defeat monster
+  defeatMonster(data.monster);
+  endBattle();
+}
+
+function defeatMonster(monster){
+  Logger.trace('defeatMonster',{q:monster.qIndex+1,score:S.player.score+100,lv:S.player.level});
+  playSound('defeat');
+  const key=`${S.currentWorld}_${S.currentRegion}_${monster.qIndex}`;
+  S.monstersDefeated[key]=true;
+  const map=S.currentMap,idx=map.monsters.indexOf(monster);
+  if(idx>-1)map.monsters.splice(idx,1);
+  S.player.score+=100;S.player.xp+=30;S.qIndex++;
+  checkLevelUp();
+  for(let i=0;i<30;i++){const colors=['#ffd166','#06d6a0','#00b4d8','#f0f0f0'];S.particles.push({x:S.player.x,y:S.player.y,vx:(Math.random()-.5)*6,vy:(Math.random()-.5)*6,size:2+Math.random()*4,life:1,decay:.015,color:colors[Math.floor(Math.random()*4)]})}
+  S.damageNumbers.push({x:S.player.x,y:S.player.y-20,text:'+100 ⭐',color:'#ffd166',size:18,life:1});
+  updateHUD();
+  if(map.monsters.length===0){S.regionsCleared[`${S.currentWorld}_${S.currentRegion}`]=true;showSummaryCard()}
+}
+
+function showSummaryCard(){
+  Logger.trace('showSummaryCard',{correct:S.correctCount,wrong:S.wrongCount,total:S.regionQuestions.length});
+  const total=S.regionQuestions.length;
+  const score=S.correctCount*100;
+  document.getElementById('scCorrect').textContent=S.correctCount;
+  document.getElementById('scWrong').textContent=S.wrongCount;
+  document.getElementById('scTotal').textContent=total;
+  document.getElementById('scScore').textContent=score+' ⭐';
+  if(S.wrongCount===0)document.getElementById('scTitle').textContent='🏆 完美通关！';
+  else if(S.correctCount>=total*0.8)document.getElementById('scTitle').textContent='🎊 区域通关！';
+  else document.getElementById('scTitle').textContent='✅ 区域完成';
+  document.getElementById('summaryCard').classList.add('active');
+  // GSAP entrance
+  gsap.from('.sc-box',{scale:.5,opacity:0,duration:.5,ease:'back.out(1.5)'});
+  gsap.from('.sc-stat-val',{y:30,opacity:0,stagger:.15,duration:.4,delay:.3,ease:'power2.out'});
+  gsap.from('.sc-score-val',{scale:0,duration:.4,delay:.6,ease:'elastic.out(1,0.5)'});
+}
+
+function closeSummaryCard(){
+  document.getElementById('summaryCard').classList.remove('active');
+  exitRegion();
+}
+
+function endBattle(){
+  document.getElementById('battleOverlay').classList.remove('active');S.screen='exploring';S.battleData=null;updateHUD();
+  // Check win
+  const world=WORLDS[S.currentWorld];
+  const allCleared=world.regions.every(rid=>S.regionsCleared[`${S.currentWorld}_${rid}`]);
+  if(allCleared){if(S.currentWorld<WORLDS.length-1){showDialog(`🎉 "${world.name}" 全部通关！\n\n新的世界已解锁！按ESC查看世界地图。`)}else{setTimeout(showWinScreen,500)}}
+}
+
+function checkLevelUp(){
+  const p=S.player;
+  while(p.xp>=p.maxXp){p.xp-=p.maxXp;p.level++;p.maxXp=Math.floor(p.maxXp*1.5);p.maxHp+=20;p.hp=p.maxHp;p.speed=Math.min(5,p.speed+.2);Logger.trace('checkLevelUp','⬆️ 升级',{lv:p.level,maxHp:p.maxHp,speed:p.speed.toFixed(1)});playSound('levelup');S.damageNumbers.push({x:p.x,y:p.y-40,text:`⬆️ Lv.${p.level}!`,color:'#06d6a0',size:22,life:1})}
+}
+
+// ============================
+// WORLD MAP
+// ============================
+function openWorldMap(){
+  S.screen='worldmap';
+  document.getElementById('worldMap').classList.add('active');
+  const container=document.getElementById('worldContent');container.innerHTML='';
+  WORLDS.forEach((world,wi)=>{
+    const worldDiv=document.createElement('div');worldDiv.className='wm-world';
+    const isUnlocked=true;
+    worldDiv.innerHTML=`<div class="wm-world-name">${world.name}${isUnlocked?'':' 🔒'}</div>`;
+    const regDiv=document.createElement('div');regDiv.className='wm-regions';
+    world.regions.forEach((rid)=>{
+      const r=REGIONS[rid];const cleared=S.regionsCleared[`${wi}_${rid}`];
+      const qs=Q[rid]||[];const defeatedCount=qs.filter((_,i)=>S.monstersDefeated[`${wi}_${rid}_${i}`]).length;
+      const card=document.createElement('div');card.className=`wr-card ${!isUnlocked?'locked':''} ${cleared?'cleared':''}`;
+      card.innerHTML=`${!isUnlocked?'<div class="rl">🔒</div>':''}<div class="ri">${r.icon}</div><div class="rn">${r.name}</div><div class="rp">${cleared?'✅ 已清除':`${defeatedCount}/${qs.length}`}</div>`;
+      if(isUnlocked&&!cleared)card.onclick=()=>enterRegion(wi,rid);
+      regDiv.appendChild(card);
+    });
+    worldDiv.appendChild(regDiv);container.appendChild(worldDiv);
+  });
+}
+function closeWorldMap(){if(S.currentRegion!==null){S.screen='exploring';document.getElementById('worldMap').classList.remove('active')}}
+
+function enterRegion(worldIdx,regionId){
+  Logger.trace('enterRegion',{world:WORLDS[worldIdx].name,region:REGIONS[regionId].name});
+  S.currentWorld=worldIdx;S.currentRegion=regionId;S.qIndex=0;S.correctCount=0;S.wrongCount=0;
+  S.regionQuestions=shuffle(Q[regionId]||[]);
+  S.currentMap=genMap(regionId);
+  S.player.x=S.currentMap.mapW/2;S.player.y=S.currentMap.mapH-100;
+  document.getElementById('worldMap').classList.remove('active');
+  document.getElementById('hud').style.display='flex';
+  document.getElementById('minimap').style.display='block';
+  const region=REGIONS[regionId];
+  showTransition(region.name,WORLDS[worldIdx].name,()=>{
+    S.screen='exploring';
+    if(S.currentMap.monsters.length>0)showDialog(`🦠 检测到 ${S.currentMap.monsters.length} 个误区病毒！\n\n走近它们，用你的医学知识打败它们！\n\n移动：WASD / 方向键 / 手机摇杆`);
+    else showSummaryCard();
+    updateHUD();
+  });
+}
+function exitRegion(){Logger.trace('exitRegion','区域通关');S.currentRegion=null;S.currentMap=null;document.getElementById('hud').style.display='none';document.getElementById('minimap').style.display='none';openWorldMap()}
+
+// ============================
+// UI HELPERS
+// ============================
+function updateHUD(){
+  const p=S.player;
+  document.getElementById('hpFill').style.width=`${(p.hp/p.maxHp)*100}%`;
+  document.getElementById('hpText').textContent=`${p.hp}/${p.maxHp}`;
+  document.getElementById('levelText').textContent=`Lv.${p.level}`;
+  document.getElementById('xpFill').style.width=`${(p.xp/p.maxXp)*100}%`;
+  document.getElementById('scoreText').textContent=`⭐ ${p.score}`;
+  if(S.currentRegion){const r=REGIONS[S.currentRegion];document.getElementById('regionText').textContent=r?r.name:''}
+}
+function showDialog(text){S.screen='dialog';const box=document.getElementById('dialogBox');box.classList.add('active');document.getElementById('dialogText').textContent=text}
+function hideDialog(){document.getElementById('dialogBox').classList.remove('active');if(S.currentRegion)S.screen='exploring'}
+function showTransition(sub,main,cb){S.screen='transition';const el=document.getElementById('transition');el.classList.add('active');document.getElementById('transText').textContent=main;document.getElementById('transSub').textContent=sub;setTimeout(()=>{el.classList.remove('active');if(cb)cb()},2000)}
+function showWinScreen(){S.screen='win';document.getElementById('winScreen').classList.add('active');const p=S.player;document.getElementById('winStats').innerHTML=`最终等级：Lv.${p.level}<br>消灭误区：${Object.keys(S.monstersDefeated).length}<br>总得分：${p.score}`}
+function showControls(){const el=document.getElementById('controlsInfo');el.style.display=el.style.display==='none'?'block':'none'}
+
+// ============================
+// INPUT
+// ============================
+document.addEventListener('keydown',e=>{S.keys[e.key]=true;if(e.key==='Escape'){if(S.screen==='exploring')openWorldMap();else if(S.screen==='worldmap'&&S.currentRegion!==null)closeWorldMap()}if(e.key===' '||e.key==='Enter'){if(S.screen==='dialog')hideDialog()}});
+document.addEventListener('keyup',e=>{S.keys[e.key]=false});
+document.getElementById('dialogBox').addEventListener('click',hideDialog);
+document.querySelectorAll('.dpad-btn').forEach(btn=>{const dir=btn.dataset.dir,setD=active=>{if(dir==='up')S.touchDir.y=active?-1:0;if(dir==='down')S.touchDir.y=active?1:0;if(dir==='left')S.touchDir.x=active?-1:0;if(dir==='right')S.touchDir.x=active?1:0};btn.addEventListener('touchstart',e=>{e.preventDefault();setD(true)});btn.addEventListener('touchend',e=>{e.preventDefault();setD(false)});btn.addEventListener('mousedown',()=>setD(true));btn.addEventListener('mouseup',()=>setD(false));btn.addEventListener('mouseleave',()=>setD(false))});
+
+// ============================
+// TITLE CELLS
+// ============================
+function createTitleCells(){const c=document.getElementById('titleCells');for(let i=0;i<20;i++){const cell=document.createElement('div');cell.className='fc';const sz=20+Math.random()*60;cell.style.width=sz+'px';cell.style.height=sz+'px';cell.style.left=Math.random()*100+'%';cell.style.background=['#00b4d8','#e63946','#06d6a0','#ffd166','#9b59b6'][Math.floor(Math.random()*5)];cell.style.animationDuration=(8+Math.random()*15)+'s';cell.style.animationDelay=Math.random()*10+'s';c.appendChild(cell)}}
+
+// ============================
+// GAME LOOP
+// ============================
+function gameLoop(){
+  const _t0=performance.now();
+  try{
+    Logger.tick();
+    if(S.currentMap){if(S.screen==='exploring')update();drawMap(S.currentMap);if(S.animFrame%3===0)drawMinimap(S.currentMap)}
+    else{ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,W(),H())}
+    const _t1=performance.now();if(_t1-_t0>16)Logger.perf('gameLoop 慢帧',_t1-_t0);
+  }catch(e){Logger.error('gameLoop 异常',e);ctx.fillStyle='#e63946';ctx.font='16px sans-serif';ctx.fillText('Error: '+e.message,20,40);console.error('Game loop error:',e)}
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================
+// START
+// ============================
+function startGame(){Logger.init();Logger.info('startGame','游戏启动');initAudio();startBGM();gsap.to('#titleScreen',{opacity:0,duration:.6,ease:'power2.in',onComplete:()=>{document.getElementById('titleScreen').style.display='none';openWorldMap();gameLoop()}})}
+createTitleCells();
+// Title pulse with GSAP
+gsap.to('#titleScreen h1',{scale:1.03,duration:1.5,ease:'sine.inOut',yoyo:true,repeat:-1});
+</script>
+</body>
+</html>
