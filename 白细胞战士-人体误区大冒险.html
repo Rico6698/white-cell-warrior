@@ -170,9 +170,67 @@ canvas{display:block}
 #debugToggle:hover{background:rgba(0,180,216,.2);transform:scale(1.1)}
 #debugToggle.has-error{border-color:#e63946;color:#e63946;animation:dbgPulse 1.5s infinite}
 @keyframes dbgPulse{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.4)}50%{box-shadow:0 0 0 6px rgba(230,57,70,0)}}
+/* Portrait lock overlay */
+#rotateOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#0a0a1a;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;color:#e0e1dd;font-family:'Microsoft YaHei',sans-serif;text-align:center;padding:30px}
+#rotateOverlay .rot-icon{font-size:80px;margin-bottom:20px;animation:rotPulse 2s ease-in-out infinite}
+@keyframes rotPulse{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+#rotateOverlay .rot-text{font-size:1.4em;margin-bottom:10px}
+#rotateOverlay .rot-hint{color:#778da9;font-size:1em}
+@media(orientation:portrait)and(max-width:1024px){#rotateOverlay{display:flex}}
+
+/* Mobile - always show controls on touch */
+@media(hover:none)and(pointer:coarse){
+  #mobileControls{display:block!important}
+}
+/* Mobile landscape adjustments */
+@media(max-height:500px){
+  #hud{top:4px;padding:6px 12px}
+  .hp-bar{width:120px;height:14px}
+  .xp-bar{width:80px;height:6px}
+  .hud-score,.hud-region,.hud-lv{font-size:.8em}
+  #minimap{width:90px;height:90px;bottom:8px;right:8px}
+  #minimapCanvas{width:90px;height:90px}
+  #mobileControls{bottom:8px;left:8px}
+  .dpad{grid-template-columns:36px 36px 36px;grid-template-rows:36px 36px 36px;gap:2px}
+  .dpad-btn{width:36px;height:36px;font-size:14px}
+  #dialogBox{bottom:60px;padding:12px;font-size:.9em}
+  .battle-question{padding:12px}
+  .battle-misconception{font-size:.9em}
+  .battle-options{gap:8px}
+  .battle-option{padding:10px 14px;font-size:.85em}
+  .battle-monster{font-size:50px}
+  .battle-monster-name{font-size:1.1em}
+  #worldMap{top:30px;height:calc(100% - 30px);padding:10px 0}
+  .wm-title{font-size:1.3em;margin-bottom:10px}
+  .wm-world{margin-bottom:12px}
+  .wm-world-name{font-size:1em;margin-bottom:6px}
+  .wm-regions{gap:8px}
+  .wr-card{width:80px;height:90px;border-radius:10px}
+  .wr-card .ri{font-size:24px;margin-bottom:2px}
+  .wr-card .rn{font-size:.7em}
+  .wr-card .rp{font-size:.6em}
+  .wm-back{padding:8px 24px;font-size:.85em}
+}
+/* Small phones */
+@media(max-height:400px){
+  .dpad{grid-template-columns:30px 30px 30px;grid-template-rows:30px 30px 30px}
+  .dpad-btn{width:30px;height:30px;font-size:12px}
+  #minimap{width:70px;height:70px}
+  #minimapCanvas{width:70px;height:70px}
+  .hp-bar{width:100px;height:12px}
+  .wr-card{width:65px;height:75px}
+  .wr-card .ri{font-size:20px}
+  .wr-card .rn{font-size:.6em}
+}
 </style>
 </head>
 <body>
+<div id="rotateOverlay">
+  <div class="rot-icon">📱</div>
+  <div class="rot-text">请旋转手机至横屏模式</div>
+  <div class="rot-hint">Turn your phone sideways to play</div>
+</div>
+
 
 
 
@@ -217,6 +275,7 @@ canvas{display:block}
     <div class="dpad-btn" data-dir="left">◀</div><div class="dpad-center"></div><div class="dpad-btn" data-dir="right">▶</div>
     <div></div><div class="dpad-btn" data-dir="down">▼</div><div></div>
   </div>
+  <button id="mobileMapBtn" onclick="if(S.screen==='exploring')openWorldMap()" style="position:absolute;top:-60px;right:0;padding:8px 16px;background:rgba(0,180,216,.3);border:1px solid rgba(0,180,216,.5);color:#00b4d8;border-radius:20px;font-size:14px;cursor:pointer;display:none;font-family:inherit">🗺️ 地图</button>
 </div>
 
 <div id="battleOverlay">
@@ -1102,6 +1161,7 @@ function enterRegion(worldIdx,regionId){
   document.getElementById('worldMap').classList.remove('active');
   document.getElementById('hud').style.display='flex';
   document.getElementById('minimap').style.display='block';
+  const mmb=document.getElementById('mobileMapBtn');if(mmb)mmb.style.display='block';
   const region=REGIONS[regionId];
   showTransition(region.name,WORLDS[worldIdx].name,()=>{
     S.screen='exploring';
@@ -1110,7 +1170,7 @@ function enterRegion(worldIdx,regionId){
     updateHUD();
   });
 }
-function exitRegion(){Logger.trace('exitRegion','区域通关');S.currentRegion=null;S.currentMap=null;document.getElementById('hud').style.display='none';document.getElementById('minimap').style.display='none';openWorldMap()}
+function exitRegion(){Logger.trace('exitRegion','区域通关');S.currentRegion=null;S.currentMap=null;document.getElementById('hud').style.display='none';document.getElementById('minimap').style.display='none';const mmb=document.getElementById('mobileMapBtn');if(mmb)mmb.style.display='none';openWorldMap()}
 
 // ============================
 // UI HELPERS
@@ -1164,6 +1224,40 @@ function startGame(){Logger.init();Logger.info('startGame','游戏启动');initA
 createTitleCells();
 // Title pulse with GSAP
 gsap.to('#titleScreen h1',{scale:1.03,duration:1.5,ease:'sine.inOut',yoyo:true,repeat:-1});
+
+// ============================
+// MOBILE ORIENTATION LOCK
+// ============================
+(function(){
+  const isMobile=/Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent);
+  if(!isMobile)return;
+  // Try screen.orientation.lock
+  if(screen.orientation&&screen.orientation.lock){
+    screen.orientation.lock('landscape').catch(()=>{});
+  }
+  // Also listen for orientation changes and re-lock
+  window.addEventListener('orientationchange',()=>{
+    if(screen.orientation&&screen.orientation.lock){
+      screen.orientation.lock('landscape').catch(()=>{});
+    }
+  });
+  // Resize minimap canvas on mobile
+  function resizeMinimapForMobile(){
+    const mc=document.getElementById('minimapCanvas');
+    const mm=document.getElementById('minimap');
+    if(!mc||!mm)return;
+    if(window.innerHeight<500){
+      const s=window.innerHeight<400?70:90;
+      mc.width=s;mc.height=s;
+      mm.style.width=s+'px';mm.style.height=s+'px';
+    }else{
+      mc.width=160;mc.height=160;
+      mm.style.width='160px';mm.style.height='160px';
+    }
+  }
+  window.addEventListener('resize',resizeMinimapForMobile);
+  resizeMinimapForMobile();
+})();
 </script>
 </body>
 </html>
