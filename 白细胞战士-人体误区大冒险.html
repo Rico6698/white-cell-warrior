@@ -55,7 +55,7 @@ canvas{display:block}
 #minimapCanvas{width:100%;height:100%}
 
 /* Battle */
-#battleOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center}
+#battleOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:200;display:none;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:20px 0;box-sizing:border-box}
 #battleOverlay.active{display:flex}
 .battle-scene{width:90%;max-width:700px;text-align:center;margin-bottom:20px}
 .battle-monster{font-size:80px;margin-bottom:8px;animation:mb 1s ease-in-out infinite}
@@ -78,6 +78,16 @@ canvas{display:block}
 .battle-result h3{color:#fff;margin-bottom:8px}
 .battle-result p{color:#a8dadc;line-height:1.6;font-size:.95em}
 .battle-continue-btn{margin-top:12px;padding:10px 30px;background:#00b4d8;color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:1em;font-family:inherit}
+
+/* Mobile responsive */
+@media(max-width:600px){
+  .battle-options{grid-template-columns:1fr!important}
+  .battle-continue-btn{display:block!important;width:80%;max-width:300px;margin:16px auto 30px;padding:14px 20px;font-size:1.15em}
+  .battle-question{padding:16px 12px;margin:12px auto}
+  .battle-scene{margin-bottom:10px}
+  .battle-monster{font-size:60px}
+  .battle-overlay{padding:15px 0}
+}
 
 /* World map */
 #worldMap{position:fixed;top:50px;left:0;width:100%;height:calc(100% - 50px);background:radial-gradient(circle,#1a1a2e,#0a0a1a);z-index:150;display:none;flex-direction:column;align-items:center;justify-content:center;overflow-y:auto;padding:30px 0}
@@ -1066,6 +1076,7 @@ function handleAnswer(idx){
   else{S.wrongCount++;Logger.warn('handleAnswer','❌ 错误',{hp:S.player.hp-20,region:S.currentRegion});S.player.hp=Math.max(0,S.player.hp-20);playSound('wrong');rd.className='battle-result show wr';rt.textContent='❌ 错误！你受到了误区伤害！';rb.textContent='➡️ 继续'}
   re.innerHTML=`<strong>📖 科学解读：</strong>${data.q.e}<br><br><em>来源：${data.q.s}</em>`;
   rb.style.display='inline-block';rb.textContent=idx===correct?'🎉 继续':'➡️ 继续';
+  setTimeout(function(){rb.scrollIntoView({behavior:'smooth',block:'center'})},100);
   updateHUD();
 }
 
